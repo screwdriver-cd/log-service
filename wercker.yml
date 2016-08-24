@@ -26,8 +26,8 @@ build:
     - script:
       name: go build
       code: |
-        go build -a -o launch
-        mv launch $ORG_SOURCE
+        go build -a -o logservice
+        mv logservice $ORG_SOURCE
 
 deploy:
   steps:
@@ -62,5 +62,5 @@ deploy:
 
     - github-upload-asset:
         token: $GITHUB_TOKEN
-        file: launch
+        file: logservice
         content_type: application/octet-stream
