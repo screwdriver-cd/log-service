@@ -2,6 +2,7 @@ jobs:
   main:
     image: golang
     steps:
+      - dir: pwd && ls && env
       - get: go get -t ./...
       - vet: go vet ./...
       - gofmt: "find . -name '*.go' | xargs gofmt -s -w"
