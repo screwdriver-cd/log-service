@@ -24,9 +24,22 @@ build:
       code: go test ./...
 
     - script:
+      name: download git version
+      code: |
+        wget $(wget -q -O - https://api.github.com/repos/screwdriver-cd/gitversion/releases/latest \
+          | awk '/browser_download_url/ { print $2 }' \
+          | sed 's/"//g')
+        chmod +x gitversion
+        mv gitversion $ORG_SOURCE
+
+    - script:
+      name: generate the new version
+      code: export VERSION=$($ORG_SOURCE/gitversion --prefix v bump auto)
+
+    - script:
       name: go build
       code: |
-        go build -a -o logservice
+        go build -a -o logservice -ldflags "-X main.VERSION=$VERSION"
         mv logservice $ORG_SOURCE
 
 deploy:
@@ -45,12 +58,16 @@ deploy:
       type: rsa
 
     - script:
-        name: get highest version from tags
-        code: export VERSION=$(bash incrementVersion.sh)
+      name: download git version
+      code: |
+        wget $(wget -q -O - https://api.github.com/repos/screwdriver-cd/gitversion/releases/latest \
+          | awk '/browser_download_url/ { print $2 }' \
+          | sed 's/"//g')
+        chmod +x gitversion
 
     - script:
-        name: add new tag
-        code: git tag $VERSION
+        name: get highest version from tags
+        code: export VERSION=$(./gitversion --prefix v bump auto)
 
     - script:
         name: push newly added tag
