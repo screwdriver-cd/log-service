@@ -23,7 +23,7 @@ var (
 const (
 	region         = "us-west-2"
 	bucket         = "logs.screwdriver.cd"
-	startupTimeout = time.Minute
+	startupTimeout = 10 * time.Minute
 )
 
 func main() {
