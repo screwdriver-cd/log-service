@@ -1,5 +1,5 @@
 # Screwdriver Log Service
-[![Build Status][wercker-image]][wercker-url]
+[![Build Status][status-image]][status-url]
 [![Open Issues][issues-image]][issues-url]
 [![Go Report Card][goreport-image]][goreport-url]
 
@@ -25,7 +25,7 @@ Code licensed under the BSD 3-Clause license. See LICENSE file for terms.
 
 [issues-image]: https://img.shields.io/github/issues/screwdriver-cd/log-service.svg
 [issues-url]: https://github.com/screwdriver-cd/log-service/issues
-[wercker-image]: https://app.wercker.com/status/be5283837a05b62c65f63fcd90d306a6
-[wercker-url]: https://app.wercker.com/project/byKey/be5283837a05b62c65f63fcd90d306a6
+[status-image]: https://cd.screwdriver.cd/pipelines/c0a9fd6a591c991e07f632c5ffe43c132b547de9/badge
+[status-url]: https://cd.screwdriver.cd/pipelines/c0a9fd6a591c991e07f632c5ffe43c132b547de9
 [goreport-image]: https://goreportcard.com/badge/github.com/screwdriver-cd/log-service
 [goreport-url]: https://goreportcard.com/report/github.com/screwdriver-cd/log-service
