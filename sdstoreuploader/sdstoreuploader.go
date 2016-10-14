@@ -41,7 +41,7 @@ type SDError struct {
 	Message    string `json:"message"`
 }
 
-// Error implemetns the error interface for SDError
+// Error implements the error interface for SDError
 func (e SDError) Error() string {
 	return fmt.Sprintf("%d %s: %s", e.StatusCode, e.Reason, e.Message)
 }
@@ -54,7 +54,7 @@ func (s *sdUploader) Upload(storePath string, filePath string) error {
 		return fmt.Errorf("generating url for file %q to %s", filePath, storePath)
 	}
 
-	err = s.putFile(u, "text/plain", filePath)
+	err = s.putFile(u, "application/x-ndjson", filePath)
 	if err != nil {
 		return fmt.Errorf("posting file %q to %s: %v", filePath, storePath, err)
 	}

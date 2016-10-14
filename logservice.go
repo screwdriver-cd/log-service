@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/screwdriver-cd/log-service/sdstoreuploader"
@@ -27,17 +28,18 @@ const (
 )
 
 func main() {
-	a := parseFlags()
+	a := App(parseFlags())
 	run(a)
 }
 
 // parseFlags returns an App object from CLI flags.
-func parseFlags() App {
+func parseFlags() app {
 	a := app{}
-	flag.StringVar(&a.url, "api-uri", "http://localhost:8080", "Base URI for the Screwdriver Store API")
+	flag.StringVar(&a.url, "api-uri", "", "Base URI for the Screwdriver Store API ($SD_API_URI)")
 	flag.StringVar(&a.emitterPath, "emitter", "/var/run/sd/emitter", "Path to the log emitter file")
-	flag.StringVar(&a.buildID, "build", "", "ID of the build that is emitting logs")
+	flag.StringVar(&a.buildID, "build", "", "ID of the build that is emitting logs ($SD_BUILDID)")
 	flag.StringVar(&a.token, "token", "", "JWT for authenticating with the Store API ($SD_TOKEN)")
+	flag.IntVar(&a.linesPerFile, "lines-per-file", 100, "Max number of lines per file when uploading ($SD_LINESPERFILE)")
 	flag.Parse()
 
 	if len(a.token) == 0 {
@@ -50,8 +52,30 @@ func parseFlags() App {
 		os.Exit(0)
 	}
 
+	if len(os.Getenv("SD_LINESPERFILE")) != 0 {
+		l, err := strconv.Atoi(os.Getenv("SD_LINESPERFILE"))
+		a.linesPerFile = l
+		if err != nil {
+			log.Println("Bad value for $SD_LINESPERFILE")
+		}
+	}
+
+	if len(a.buildID) == 0 {
+		a.buildID = os.Getenv("SD_BUILDID")
+	}
+
 	if len(a.buildID) == 0 {
 		log.Println("No buildID specified. Cannot log.")
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if len(a.url) == 0 {
+		a.url = os.Getenv("SD_API_URI")
+	}
+
+	if len(a.url) == 0 {
+		log.Println("No API URI specified. Cannot send logs anywhere.")
 		flag.Usage()
 		os.Exit(0)
 	}
@@ -72,6 +96,7 @@ type app struct {
 	emitterPath,
 	buildID,
 	url string
+	linesPerFile int
 }
 
 // Uploader returns an Uploader object for the Screwdriver Store
@@ -81,9 +106,10 @@ func (a app) Uploader() sdstoreuploader.SDStoreUploader {
 
 // LogReader returns a Reader that is the log source.
 func (a app) LogReader() io.Reader {
-	// If we can't open the socket in the first 60s, the sender probably
+	// If we can't open the socket in the first 10 minutes, the sender probably
 	// exited before transmitting any data. Since we are reading from
-	// a FIFO, we will block forever unless we bail.
+	// a FIFO, we will block forever unless we bail. 10 minutes should be enough time
+	// to download all relevant docker images before starting.
 	t := time.AfterFunc(startupTimeout, func() {
 		log.Printf("No data in the first %s. Assuming catastophe.", startupTimeout)
 		os.Exit(0)

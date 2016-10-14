@@ -19,7 +19,14 @@ import (
 
 type logMap map[string][]*logLine
 
-var mockEmitterPath = "./data/emitterdata"
+const (
+	defaultEmitter   = "/var/run/sd/emitter"
+	mockURL          = "http://fakeurl"
+	mockEmitterPath  = "./data/emitterdata"
+	mockToken        = "FAKETOKEN"
+	mockBuildID      = "fakebuildid"
+	mockLinesPerFile = 100
+)
 
 func mockEmitter() *os.File {
 	e, err := os.Open(mockEmitterPath)
@@ -153,6 +160,33 @@ func parseLogData(input io.Reader) (logMap, error) {
 
 // ----------------------------------------------------------------------------
 // Actual tests below
+
+func TestParseFlags(t *testing.T) {
+	os.Setenv("SD_TOKEN", mockToken)
+	os.Setenv("SD_BUILDID", mockBuildID)
+	os.Setenv("SD_API_URI", mockURL)
+	a := parseFlags()
+	if a.token != mockToken {
+		t.Errorf("App token = %s, want %s", a.token, mockToken)
+	}
+
+	if a.emitterPath != defaultEmitter {
+		t.Errorf("Emitter path = %s, want %s", a.emitterPath, defaultEmitter)
+	}
+
+	if a.buildID != mockBuildID {
+		t.Errorf("Build ID = %s, want %s", a.buildID, mockBuildID)
+	}
+
+	if a.url != mockURL {
+		t.Errorf("URL = %s, want %s", a.url, mockURL)
+	}
+
+	if a.linesPerFile != mockLinesPerFile {
+		t.Errorf("Lines per file= %d, want %d", a.linesPerFile, mockLinesPerFile)
+	}
+
+}
 
 func TestAppReader(t *testing.T) {
 	want := bytes.NewBuffer(nil)
