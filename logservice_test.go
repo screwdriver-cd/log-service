@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -64,9 +65,13 @@ func newTestApp() *mockApp {
 }
 
 func newRealApp() App {
+	return newAppFromEmitter("data/emitterdata")
+}
+
+func newAppFromEmitter(emitterPath string) App {
 	a := app{
 		url:         "http://localhost:8080",
-		emitterPath: "data/emitterdata",
+		emitterPath: emitterPath,
 		buildID:     "build123",
 		token:       "faketoken",
 	}
@@ -220,5 +225,19 @@ func TestArchiveLogsStepSaver(t *testing.T) {
 		if !reflect.DeepEqual(gotLogs[k], wantLogs[k]) {
 			t.Errorf("\ngotLogs[%s] =\n  %s,\nwant\n  %s\n\n", k, v, wantLogs[k])
 		}
+	}
+}
+
+// Make sure we don't break if there are no logs
+func TestEmptyEmitter(t *testing.T) {
+	f, err := ioutil.TempFile("", "tempfile")
+	if err != nil {
+		panic(err)
+	}
+
+	a := newAppFromEmitter(f.Name())
+	err = ArchiveLogs(a)
+	if err != nil {
+		t.Errorf("Unexpected error from Archivelogs: %v", err)
 	}
 }

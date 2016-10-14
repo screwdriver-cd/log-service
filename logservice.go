@@ -162,6 +162,6 @@ func ArchiveLogs(a App) error {
 		}
 	}
 
-	stepSaver.Close()
+	safeClose(stepSaver)
 	return nil
 }
