@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/screwdriver-cd/log-service/sdstoreuploader"
@@ -28,7 +29,7 @@ type logFile struct {
 
 // newLogFile returns a logFile object for saving a single file to the Store.
 func newLogFile(uploader sdstoreuploader.SDStoreUploader, storePath string) (*logFile, error) {
-	file, err := ioutil.TempFile("", storePath)
+	file, err := ioutil.TempFile("", filepath.Base(storePath))
 	if err != nil {
 		return &logFile{}, fmt.Errorf("creating temporary file for %s: %v", storePath, err)
 	}

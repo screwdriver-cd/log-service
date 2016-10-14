@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"path"
 	"sync"
 	"time"
 
@@ -119,7 +120,8 @@ func (s *stepSaver) Write(p []byte) (int, error) {
 			s.LogFiles()[fileNum-1].Save()
 		}
 
-		destination := fmt.Sprintf("%s-log.%d", s.StepName, fileNum)
+		logpath := fmt.Sprintf("log.%d", fileNum)
+		destination := path.Join(s.StepName, logpath)
 		err := s.newLogFile(destination)
 		if err != nil {
 			return 0, fmt.Errorf("creating log #%d for step %s: %v", fileNum, s.StepName, err)

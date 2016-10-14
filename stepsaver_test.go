@@ -39,7 +39,7 @@ func TestWrite(t *testing.T) {
 		t.Fatalf("StepSaver should make 1 new logfile. Got %d", len(s.logFiles))
 	}
 
-	wantPath := fmt.Sprintf("%s-log.0", testStepName)
+	wantPath := fmt.Sprintf("%s/log.0", testStepName)
 	if s.logFiles[0].storePath != wantPath {
 		t.Errorf("storePath = %s, want %s", s.logFiles[0].storePath, wantPath)
 	}
@@ -56,7 +56,7 @@ func TestWrite(t *testing.T) {
 		t.Errorf("StepSaver should create a second logfile when the first fills up. Got %d", len(s.logFiles))
 	}
 
-	wantPath = fmt.Sprintf("%s-log.1", testStepName)
+	wantPath = fmt.Sprintf("%s/log.1", testStepName)
 	if s.logFiles[1].storePath != wantPath {
 		t.Errorf("storePath = %s, want %s", s.logFiles[1].storePath, wantPath)
 	}
