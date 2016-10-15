@@ -3,69 +3,167 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
-	"path"
-	"sync"
+	"strconv"
 	"time"
 
-	"github.com/screwdriver-cd/log-service/s3fileuploader"
+	"github.com/screwdriver-cd/log-service/sdstoreuploader"
 )
 
 var (
-	emitterPath    = "/var/run/sd/emitter"
 	uploadInterval = 2 * time.Second
+	linesPerFile   = 100
 )
 
 const (
 	region         = "us-west-2"
 	bucket         = "logs.screwdriver.cd"
 	startupTimeout = 10 * time.Minute
+	logBufferSize  = 200
+	maxLineSize    = 1000
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		log.Println("No buildID specified. Cannot log.")
+	a := App(parseFlags())
+	run(a)
+}
+
+// parseFlags returns an App object from CLI flags.
+func parseFlags() app {
+	a := app{}
+	flag.StringVar(&a.url, "api-uri", "", "Base URI for the Screwdriver Store API ($SD_API_URI)")
+	flag.StringVar(&a.emitterPath, "emitter", "/var/run/sd/emitter", "Path to the log emitter file")
+	flag.StringVar(&a.buildID, "build", "", "ID of the build that is emitting logs ($SD_BUILDID)")
+	flag.StringVar(&a.token, "token", "", "JWT for authenticating with the Store API ($SD_TOKEN)")
+	flag.IntVar(&a.linesPerFile, "lines-per-file", 100, "Max number of lines per file when uploading ($SD_LINESPERFILE)")
+	flag.Parse()
+
+	if len(a.token) == 0 {
+		a.token = os.Getenv("SD_TOKEN")
+	}
+
+	if len(a.token) == 0 {
+		log.Println("No JWT specified. Cannot upload.")
+		flag.Usage()
 		os.Exit(0)
 	}
 
-	buildID := os.Args[1]
-	log.Println("Processing logs for build", buildID)
+	if len(os.Getenv("SD_LINESPERFILE")) != 0 {
+		l, err := strconv.Atoi(os.Getenv("SD_LINESPERFILE"))
+		a.linesPerFile = l
+		if err != nil {
+			log.Println("Bad value for $SD_LINESPERFILE")
+		}
+	}
 
-	// If we can't open the socket in the first 60s, the sender probably
+	if len(a.buildID) == 0 {
+		a.buildID = os.Getenv("SD_BUILDID")
+	}
+
+	if len(a.buildID) == 0 {
+		log.Println("No buildID specified. Cannot log.")
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if len(a.url) == 0 {
+		a.url = os.Getenv("SD_API_URI")
+	}
+
+	if len(a.url) == 0 {
+		log.Println("No API URI specified. Cannot send logs anywhere.")
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	return a
+}
+
+// App implements the main App's interface
+type App interface {
+	LogReader() io.Reader
+	Uploader() sdstoreuploader.SDStoreUploader
+	BuildID() string
+	StepSaver(step string) StepSaver
+}
+
+type app struct {
+	token,
+	emitterPath,
+	buildID,
+	url string
+	linesPerFile int
+}
+
+// Uploader returns an Uploader object for the Screwdriver Store
+func (a app) Uploader() sdstoreuploader.SDStoreUploader {
+	return sdstoreuploader.NewFileUploader(a.buildID, a.url, a.token)
+}
+
+// LogReader returns a Reader that is the log source.
+func (a app) LogReader() io.Reader {
+	// If we can't open the socket in the first 10 minutes, the sender probably
 	// exited before transmitting any data. Since we are reading from
-	// a FIFO, we will block forever unless we bail.
+	// a FIFO, we will block forever unless we bail. 10 minutes should be enough time
+	// to download all relevant docker images before starting.
 	t := time.AfterFunc(startupTimeout, func() {
 		log.Printf("No data in the first %s. Assuming catastophe.", startupTimeout)
 		os.Exit(0)
 	})
-	source, err := os.Open(emitterPath)
+	source, err := os.Open(a.emitterPath)
 	t.Stop()
 	if err != nil {
-		log.Printf("Failed opening %v: %v", emitterPath, err)
+		log.Printf("Failed opening %v: %v", a.emitterPath, err)
 		os.Exit(0)
 	}
 
-	uploader := s3fileuploader.NewS3FileUploader(region)
-	if err := archiveLogs(uploader, buildID, source); err != nil {
-		log.Printf("Error moving logs to S3: %v", err)
+	return source
+}
+
+// StepSaver returns a new StepSaver object based on the app config
+func (a app) StepSaver(step string) StepSaver {
+	return NewStepSaver(step, a.Uploader())
+}
+
+// BuildID returns the id of the build being processed.
+func (a app) BuildID() string {
+	return a.buildID
+}
+
+// run is a thin wrapper around ArchiveLogs.
+func run(a App) {
+	log.Println("Processing logs for build", a.BuildID())
+	defer log.Println("Processing complete for build", a.BuildID())
+
+	if err := ArchiveLogs(a); err != nil {
+		log.Printf("Error archiving logs: %v", err)
 		os.Exit(0)
 	}
 }
 
-// archiveLogs copies log lines from src into an S3 bucket.
-// Logs are copied to /buildID/stepName
-func archiveLogs(uploader s3fileuploader.S3FileUploader, buildID string, src io.Reader) error {
+// safeClose is for closing when we might have a nil reference.
+func safeClose(c io.Closer) error {
+	if c == nil {
+		return nil
+	}
+
+	return c.Close()
+}
+
+// ArchiveLogs copies log lines from src into the Screwdriver Store
+// Logs are copied to /builds/:buildId/:stepName/log.N
+func ArchiveLogs(a App) error {
 	log.Println("Archiver started")
+	defer log.Println("Archiver stopped")
 
-	var wg sync.WaitGroup
-	steps := make(map[string]chan *logLine)
 	var lastStep string
+	var stepSaver StepSaver
 
-	scanner := bufio.NewScanner(src)
+	scanner := bufio.NewScanner(a.LogReader())
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -74,107 +172,22 @@ func archiveLogs(uploader s3fileuploader.S3FileUploader, buildID string, src io.
 			return fmt.Errorf("unmarshaling log line %s: %v", line, err)
 		}
 
-		// Get a channel to send the log to
-		c, ok := steps[newLog.Step]
-		if !ok {
-			if steps[lastStep] != nil {
-				close(steps[lastStep])
-				delete(steps, lastStep)
+		if newLog.Step != lastStep {
+			if err := safeClose(stepSaver); err != nil {
+				return fmt.Errorf("trying to close the StepSaver for %s: %v", lastStep, err)
 			}
+
+			stepSaver = a.StepSaver(newLog.Step)
+			log.Println("Starting step processing for", newLog.Step)
+
 			lastStep = newLog.Step
-
-			c = make(chan *logLine, 50)
-			steps[newLog.Step] = c
-
-			// Process the logs for this step in the background
-			wg.Add(1)
-			go func(buildID, step string, c chan *logLine) {
-				defer wg.Done()
-				processLogs(uploader, buildID, step, c)
-			}(buildID, newLog.Step, c)
 		}
 
-		c <- newLog
+		if err := stepSaver.WriteLog(newLog); err != nil {
+			return fmt.Errorf("writing logs for step %s: %v", newLog.Step, err)
+		}
 	}
 
-	// Close any channel that might be open still
-	for _, v := range steps {
-		close(v)
-	}
-
-	wg.Wait()
-
+	safeClose(stepSaver)
 	return nil
-}
-
-type logLine struct {
-	Time    int64  `json:"t"`
-	Message string `json:"m"`
-	Step    string `json:"s"`
-}
-
-type s3LogLine struct {
-	Time    int64  `json:"t"`
-	Message string `json:"m"`
-	Line    int    `json:"n"`
-}
-
-func processLogs(u s3fileuploader.S3FileUploader, buildID, stepName string, logs chan *logLine) error {
-	log.Println("Starting step processing for", stepName)
-
-	cache, err := ioutil.TempFile("", stepName)
-	if err != nil {
-		return err
-	}
-	defer os.Remove(cache.Name())
-	encoder := json.NewEncoder(cache)
-
-	s3key := path.Join(buildID, stepName)
-
-	// Every upload is identical
-	lineCount := 0
-	savedLineCount := 0
-	upload := func() {
-		if lineCount == savedLineCount {
-			return
-		}
-		log.Println("Uploading", cache.Name())
-		u.Upload(bucket, s3key, cache)
-		savedLineCount = lineCount
-	}
-
-	// Ship the logs every uploadInterval.
-	ticker := time.NewTicker(uploadInterval)
-	defer ticker.Stop()
-	t := ticker.C
-
-	for {
-		select {
-		case l, ok := <-logs:
-			if !ok {
-				// End of logs. Send to S3 one last time
-				upload()
-				return nil
-			}
-
-			// Write the new line to our cache file
-			s3Line := s3LogLine{
-				Time:    l.Time,
-				Message: l.Message,
-				Line:    lineCount,
-			}
-
-			if err := encoder.Encode(s3Line); err != nil {
-				return fmt.Errorf("marshaling log line %v: %v", s3Line, err)
-			}
-			lineCount++
-
-			if lineCount-savedLineCount > 200 {
-				upload()
-			}
-
-		case <-t:
-			upload()
-		}
-	}
 }

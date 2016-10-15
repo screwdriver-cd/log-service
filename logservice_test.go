@@ -2,45 +2,153 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
-	"path"
-	"path/filepath"
-	"strings"
+	"reflect"
 	"testing"
-	"time"
+
+	"github.com/screwdriver-cd/log-service/sdstoreuploader"
 )
 
-type mockS3FileUploader struct {
-	upload func(string, string, *os.File) error
+// ----------------------------------------------------------------------------
+// A bunch of mock and util stuff
+
+type logMap map[string][]*logLine
+
+const (
+	defaultEmitter   = "/var/run/sd/emitter"
+	mockURL          = "http://fakeurl"
+	mockEmitterPath  = "./data/emitterdata"
+	mockToken        = "FAKETOKEN"
+	mockBuildID      = "fakebuildid"
+	mockLinesPerFile = 100
+)
+
+func mockEmitter() *os.File {
+	e, err := os.Open(mockEmitterPath)
+	if err != nil {
+		panic(fmt.Errorf("Could not open fake emitter source: %v", err))
+	}
+	return e
 }
 
-func (m *mockS3FileUploader) Upload(bucket, key string, input *os.File) error {
+type mockStepSaver struct {
+	writeLog func(l *logLine) error
+}
+
+func (s mockStepSaver) Close() error {
+	return nil
+}
+
+func (s mockStepSaver) WriteLog(l *logLine) error {
+	if s.writeLog != nil {
+		return s.writeLog(l)
+	}
+	return nil
+}
+
+func (s mockStepSaver) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+type mockSDStoreUploader struct {
+	upload func(string, string) error
+}
+
+func (m *mockSDStoreUploader) Upload(path string, filePath string) error {
 	if m.upload != nil {
-		return m.upload(bucket, key, input)
+		return m.upload(path, filePath)
 	}
 
 	return nil
 }
 
-func parseLogFile(input *os.File) ([]*s3LogLine, error) {
-	newLogs := []*s3LogLine{}
+func newTestApp() *mockApp {
+	return &mockApp{}
+}
 
+func newRealApp() App {
+	return newAppFromEmitter("data/emitterdata")
+}
+
+func newAppFromEmitter(emitterPath string) App {
+	a := app{
+		url:         "http://localhost:8080",
+		emitterPath: emitterPath,
+		buildID:     "build123",
+		token:       "faketoken",
+	}
+
+	return a
+}
+
+type mockApp struct {
+	run         func()
+	logReader   func() io.Reader
+	uploader    func() sdstoreuploader.SDStoreUploader
+	archiveLogs func(uploader sdstoreuploader.SDStoreUploader, src io.Reader) error
+	stepSaver   func(step string) StepSaver
+	buildID     string
+}
+
+func (a mockApp) Run() {
+	if a.run != nil {
+		a.run()
+	}
+}
+
+func (a mockApp) LogReader() io.Reader {
+	if a.logReader != nil {
+		return a.logReader()
+	}
+
+	return mockEmitter()
+}
+
+func (a mockApp) Uploader() sdstoreuploader.SDStoreUploader {
+	if a.uploader != nil {
+		return a.uploader()
+	}
+
+	return &mockSDStoreUploader{}
+}
+
+func (a mockApp) BuildID() string {
+	return a.buildID
+}
+
+func (a mockApp) StepSaver(step string) StepSaver {
+	if a.stepSaver != nil {
+		return a.stepSaver(step)
+	}
+	return &stepSaver{}
+}
+
+func parseLogFile(input *os.File) (logMap, error) {
 	// Re-open the file so we don't need to seek to the beginning
 	input, err := os.Open(input.Name())
 	if err != nil {
 		return nil, err
 	}
 
+	return parseLogData(input)
+}
+
+func parseLogData(input io.Reader) (logMap, error) {
+	newLogs := logMap{}
+
 	scanner := bufio.NewScanner(input)
 	for scanner.Scan() {
 		line := scanner.Text()
-		newLog := &s3LogLine{}
+		newLog := &logLine{}
 		if err := json.Unmarshal([]byte(line), newLog); err != nil {
 			return nil, fmt.Errorf("unmarshaling log line %s: %v", line, err)
 		}
-		newLogs = append(newLogs, newLog)
+		newLogs[newLog.Step] = append(newLogs[newLog.Step], newLog)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -50,160 +158,120 @@ func parseLogFile(input *os.File) ([]*s3LogLine, error) {
 	return newLogs, nil
 }
 
-func TestArchiveLogs(t *testing.T) {
-	sdbucket := "logs.screwdriver.cd"
-	buildID := "testbuild123"
-	uploader := mockS3FileUploader{}
-	src, err := os.Open("./data/emitterdata")
+// ----------------------------------------------------------------------------
+// Actual tests below
+
+func TestParseFlags(t *testing.T) {
+	os.Setenv("SD_TOKEN", mockToken)
+	os.Setenv("SD_BUILDID", mockBuildID)
+	os.Setenv("SD_API_URI", mockURL)
+	a := parseFlags()
+	if a.token != mockToken {
+		t.Errorf("App token = %s, want %s", a.token, mockToken)
+	}
+
+	if a.emitterPath != defaultEmitter {
+		t.Errorf("Emitter path = %s, want %s", a.emitterPath, defaultEmitter)
+	}
+
+	if a.buildID != mockBuildID {
+		t.Errorf("Build ID = %s, want %s", a.buildID, mockBuildID)
+	}
+
+	if a.url != mockURL {
+		t.Errorf("URL = %s, want %s", a.url, mockURL)
+	}
+
+	if a.linesPerFile != mockLinesPerFile {
+		t.Errorf("Lines per file= %d, want %d", a.linesPerFile, mockLinesPerFile)
+	}
+
+}
+
+func TestAppReader(t *testing.T) {
+	want := bytes.NewBuffer(nil)
+	f, _ := os.Open(mockEmitterPath)
+	io.Copy(want, f)
+	f.Close()
+
+	a := newRealApp()
+	got := bytes.NewBuffer(nil)
+	io.Copy(got, a.LogReader())
+
+	if got.String() != want.String() {
+		t.Errorf("App.Reader() = %s, want %s", got, want)
+	}
+}
+
+func TestArchiveLogsStepSaver(t *testing.T) {
+	a := newTestApp()
+
+	wantSteps := []string{
+		"step0",
+		"step1",
+		"step2",
+		"step3",
+		"step4",
+	}
+	var gotSteps []string
+
+	wantLogs, err := parseLogData(a.LogReader())
 	if err != nil {
-		t.Fatalf("Failed to open the test input file emitterdata: %v", err)
+		t.Fatalf("Unexpected error fetching test data: %v", err)
 	}
 
-	wantLogCounts := map[string]int{
-		"step0": 2,
-		"step1": 5,
-		"step2": 7,
-		"step3": 1,
-		"step4": 5,
+	// This is just here to be absolutely certain that the right data was loaded.
+	// Delete if it gets annoying to add test data
+	if len(wantLogs) != 5 {
+		t.Errorf("Want %d logs, got %d", 5, len(wantLogs))
+	}
+	gotLogs := logMap{}
+
+	a.stepSaver = func(step string) StepSaver {
+		gotSteps = append(gotSteps, step)
+		gotLogs[step] = []*logLine{}
+		s := mockStepSaver{}
+		s.writeLog = func(l *logLine) error {
+			gotLogs[step] = append(gotLogs[step], l)
+			return nil
+		}
+		return s
 	}
 
-	stepCount := 0
-	uploader.upload = func(bucket, key string, input *os.File) error {
-		stepCount++
-		if bucket != sdbucket {
-			t.Errorf("bucket=%s, want %s", bucket, sdbucket)
-		}
+	// This is the one line being tested...
+	run(a)
 
-		keystep := filepath.Base(key)
-		filestep := filepath.Base(input.Name())
-		if !strings.HasPrefix(filestep, keystep) {
-			t.Errorf("filestep=%s, should start with %s", filestep, keystep)
-		}
-
-		wantkey := path.Join(buildID, keystep)
-		if key != wantkey {
-			t.Errorf("key=%s, want %s", key, wantkey)
-		}
-
-		logs, err := parseLogFile(input)
-		if err != nil {
-			t.Fatalf("Unexpected error parsing the log file for bucket %s and key %s: %v", bucket, key, err)
-		}
-
-		lastline := -1
-		for _, log := range logs {
-			lastline++
-			if log.Line != lastline {
-				t.Errorf("log.Line=%d, want %d", log.Line, lastline)
-			}
-		}
-
-		wantLogCount, ok := wantLogCounts[keystep]
-		if !ok {
-			t.Errorf("Unexpected step %s logged", keystep)
-		}
-		if len(logs) != wantLogCount {
-			t.Errorf("len(%s)=%d, want %d", keystep, len(logs), wantLogCount)
-		}
-
-		return nil
+	if len(gotLogs) != len(wantLogs) {
+		t.Errorf("len(gotLogs) = %d, want %d. gotLogs = %v", len(gotLogs), len(wantLogs), gotLogs)
 	}
 
-	archiveLogs(&uploader, buildID, src)
-	fmt.Println("Count", stepCount)
-	if stepCount != len(wantLogCounts) {
-		t.Errorf("stepCount=%d, want %d", stepCount, len(wantLogCounts))
+	if len(gotSteps) != len(wantSteps) {
+		t.Errorf("len(gotSteps) = %d, want %d. gotSteps = %v", len(gotSteps), len(wantSteps), gotSteps)
+	}
+
+	for i := range gotSteps {
+		if gotSteps[i] != wantSteps[i] {
+			t.Errorf("gotSteps[%d] = %s, want %s", i, gotSteps[i], wantSteps[i])
+		}
+	}
+
+	for k, v := range gotLogs {
+		if !reflect.DeepEqual(gotLogs[k], wantLogs[k]) {
+			t.Errorf("\ngotLogs[%s] =\n  %s,\nwant\n  %s\n\n", k, v, wantLogs[k])
+		}
 	}
 }
 
-func TestProcessLogsTime(t *testing.T) {
-	buildID := "testbuild123"
-	stepName := "step1"
-	oldUploadInterval := uploadInterval
-	defer func() { uploadInterval = oldUploadInterval }()
-	uploadInterval = 20 * time.Millisecond
-
-	callCount := 0
-	uploader := mockS3FileUploader{}
-	uploaded := make(chan struct{})
-	uploader.upload = func(bucket, key string, input *os.File) error {
-		callCount++
-		uploaded <- struct{}{}
-		return nil
+// Make sure we don't break if there are no logs
+func TestEmptyEmitter(t *testing.T) {
+	f, err := ioutil.TempFile("", "tempfile")
+	if err != nil {
+		panic(err)
 	}
 
-	logChan := make(chan *logLine, 100)
-	for i := 0; i < 30; i++ {
-		logChan <- &logLine{time.Now().UnixNano(), fmt.Sprintf("Msg %d", i), stepName}
-	}
-	go processLogs(&uploader, buildID, stepName, logChan)
-	startTime := time.Now()
-
-	bailTimer := time.NewTimer(2 * time.Second)
-
-	select {
-	case <-bailTimer.C:
-		t.Errorf("Upload was never called after 2 seconds")
-	case <-uploaded:
-	}
-	bailTimer.Stop()
-
-	elapsed := time.Since(startTime)
-	if callCount != 1 {
-		t.Errorf("callCount=%d, want 1", callCount)
-	}
-	if elapsed < time.Duration(uploadInterval) {
-		t.Errorf("Only %s elapsed. Want %s", elapsed, time.Duration(uploadInterval))
-	}
-	if elapsed >= time.Duration(2*uploadInterval) {
-		t.Errorf("Waited %s for an upload. Want %s", elapsed, time.Duration(uploadInterval))
-	}
-}
-
-func TestProcessLogsLine(t *testing.T) {
-	buildID := "testbuild123"
-	stepName := "step1"
-	oldUploadInterval := uploadInterval
-	defer func() { uploadInterval = oldUploadInterval }()
-	uploader := mockS3FileUploader{}
-	uploadInterval = 20 * time.Second
-
-	uploaded := make(chan struct{})
-	uploader.upload = func(bucket, key string, input *os.File) error {
-		uploaded <- struct{}{}
-		return nil
-	}
-
-	logChan := make(chan *logLine, 350)
-
-	go processLogs(&uploader, buildID, stepName, logChan)
-
-	for i := 0; i <= 199; i++ {
-		logChan <- &logLine{time.Now().UnixNano(), fmt.Sprintf("Msg %d", i), stepName}
-	}
-
-	bailTimer := time.NewTimer(20 * time.Millisecond)
-	select {
-	case <-bailTimer.C:
-	case <-uploaded:
-		t.Errorf("Upload should not happen")
-	}
-	bailTimer.Stop()
-
-	logChan <- &logLine{time.Now().UnixNano(), fmt.Sprintf("Msg %d", 200), stepName}
-	bailTimer = time.NewTimer(20 * time.Millisecond)
-	select {
-	case <-bailTimer.C:
-		t.Errorf("Upload was never called")
-	case <-uploaded:
-	}
-
-	logChan <- &logLine{time.Now().UnixNano(), fmt.Sprintf("Msg %d", 200), stepName}
-	close(logChan)
-	bailTimer = time.NewTimer(20 * time.Millisecond)
-	select {
-	case <-bailTimer.C:
-		t.Errorf("Upload was never called")
-	case <-uploaded:
+	a := newAppFromEmitter(f.Name())
+	err = ArchiveLogs(a)
+	if err != nil {
+		t.Errorf("Unexpected error from Archivelogs: %v", err)
 	}
 }
