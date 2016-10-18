@@ -40,6 +40,7 @@ type stepSaver struct {
 	encoder        *json.Encoder
 	ticker         *time.Ticker
 	mutex          sync.Mutex
+	linesPerFile   int
 }
 
 // Close cancels the save ticker, saves the logs for this step, and closes the logFiles.
@@ -108,16 +109,21 @@ func (s *stepSaver) LogFiles() []*logFile {
 func (s *stepSaver) Write(p []byte) (int, error) {
 	defer func() { s.lineCount++ }()
 
-	fileNum := s.lineCount / linesPerFile
+	fileNum := s.lineCount / s.linesPerFile
 
 	// We have passed the linePerFile limit and need to create a new file
 	if fileNum >= len(s.LogFiles()) {
 		log.Println("Making a new log file:", fileNum, s.StepName)
 
-		// Synchronously save the old file before proceeding
+		// Save the old file one last time before proceeding
 		if fileNum > 0 {
 			log.Println("About to save log file:", fileNum-1, s.StepName)
-			s.LogFiles()[fileNum-1].Save()
+			go func() {
+				err := s.LogFiles()[fileNum-1].Save()
+				if err != nil {
+					log.Printf("Error encountered saving logs: %v", err)
+				}
+			}()
 		}
 
 		logpath := fmt.Sprintf("log.%d", fileNum)
@@ -155,8 +161,8 @@ func (s *stepSaver) Save() error {
 }
 
 // NewStepSaver creates a StepSaver out of a name and sdstoreuploader.SDStoreUploader
-func NewStepSaver(name string, uploader sdstoreuploader.SDStoreUploader) StepSaver {
-	s := &stepSaver{StepName: name, Uploader: uploader, ticker: time.NewTicker(uploadInterval)}
+func NewStepSaver(name string, uploader sdstoreuploader.SDStoreUploader, linesPerFile int) StepSaver {
+	s := &stepSaver{StepName: name, Uploader: uploader, ticker: time.NewTicker(uploadInterval), linesPerFile: linesPerFile}
 	e := json.NewEncoder(s)
 	s.encoder = e
 

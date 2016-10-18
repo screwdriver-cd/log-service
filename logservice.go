@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/screwdriver-cd/log-service/sdstoreuploader"
@@ -16,15 +17,13 @@ import (
 
 var (
 	uploadInterval = 2 * time.Second
-	linesPerFile   = 100
 )
 
 const (
-	region         = "us-west-2"
-	bucket         = "logs.screwdriver.cd"
-	startupTimeout = 10 * time.Minute
-	logBufferSize  = 200
-	maxLineSize    = 1000
+	defaultLinesPerFile = 100
+	startupTimeout      = 10 * time.Minute
+	logBufferSize       = 200
+	maxLineSize         = 1000
 )
 
 func main() {
@@ -39,7 +38,7 @@ func parseFlags() app {
 	flag.StringVar(&a.emitterPath, "emitter", "/var/run/sd/emitter", "Path to the log emitter file")
 	flag.StringVar(&a.buildID, "build", "", "ID of the build that is emitting logs ($SD_BUILDID)")
 	flag.StringVar(&a.token, "token", "", "JWT for authenticating with the Store API ($SD_TOKEN)")
-	flag.IntVar(&a.linesPerFile, "lines-per-file", 100, "Max number of lines per file when uploading ($SD_LINESPERFILE)")
+	flag.IntVar(&a.linesPerFile, "lines-per-file", defaultLinesPerFile, "Max number of lines per file when uploading ($SD_LINESPERFILE)")
 	flag.Parse()
 
 	if len(a.token) == 0 {
@@ -126,7 +125,7 @@ func (a app) LogReader() io.Reader {
 
 // StepSaver returns a new StepSaver object based on the app config
 func (a app) StepSaver(step string) StepSaver {
-	return NewStepSaver(step, a.Uploader())
+	return NewStepSaver(step, a.Uploader(), a.linesPerFile)
 }
 
 // BuildID returns the id of the build being processed.
@@ -162,6 +161,7 @@ func ArchiveLogs(a App) error {
 
 	var lastStep string
 	var stepSaver StepSaver
+	var stepWaitGroup sync.WaitGroup
 
 	scanner := bufio.NewScanner(a.LogReader())
 	for scanner.Scan() {
@@ -173,9 +173,13 @@ func ArchiveLogs(a App) error {
 		}
 
 		if newLog.Step != lastStep {
-			if err := safeClose(stepSaver); err != nil {
-				return fmt.Errorf("trying to close the StepSaver for %s: %v", lastStep, err)
-			}
+			stepWaitGroup.Add(1)
+			go func(stepSaver StepSaver, stepName string) {
+				defer stepWaitGroup.Done()
+				if err := safeClose(stepSaver); err != nil {
+					log.Printf("ERROR: step %s encountered errors on final save: %v", stepName, err)
+				}
+			}(stepSaver, lastStep)
 
 			stepSaver = a.StepSaver(newLog.Step)
 			log.Println("Starting step processing for", newLog.Step)
@@ -189,5 +193,6 @@ func ArchiveLogs(a App) error {
 	}
 
 	safeClose(stepSaver)
+	stepWaitGroup.Wait()
 	return nil
 }

@@ -76,5 +76,18 @@ func (l *logFile) Write(p []byte) (int, error) {
 func (l *logFile) Close() error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	return l.file.Close()
+
+	// If the file is already closed, make this a no-op
+	if l.file == nil {
+		return nil
+	}
+
+	f := l.file
+	if err := f.Close(); err != nil {
+		return err
+	}
+
+	l.file = nil
+
+	return os.Remove(f.Name())
 }
