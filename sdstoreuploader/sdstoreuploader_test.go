@@ -31,7 +31,9 @@ func makeFakeHTTPClient(t *testing.T, code int, body string, v func(r *http.Requ
 		wantTokenHeader := fmt.Sprintf("Bearer %s", wantToken)
 
 		validateHeader(t, "Authorization", wantTokenHeader)(r)
-		v(r)
+		if v != nil {
+			v(r)
+		}
 
 		w.WriteHeader(code)
 		w.Header().Set("Content-Type", "application/json")
@@ -107,5 +109,32 @@ func TestFileUpload(t *testing.T) {
 
 	if !called {
 		t.Fatalf("The HTTP client was never used.")
+	}
+}
+
+func TestFileUploadRetry(t *testing.T) {
+	retryScaler = .01
+	testBuildID := "testbuild"
+	url := "http://fakeurl"
+	token := "faketoken"
+	testPath := "test/path/1"
+	uploader := &sdUploader{
+		testBuildID,
+		url,
+		token,
+		&http.Client{Timeout: 10 * time.Second},
+	}
+
+	callCount := 0
+	http := makeFakeHTTPClient(t, 500, "ERROR", func(r *http.Request) {
+		callCount++
+	})
+	uploader.client = http
+	err := uploader.Upload(testPath, testFile().Name())
+	if err == nil {
+		t.Error("Expected error from uploader.Upload(), got nil")
+	}
+	if callCount != 6 {
+		t.Errorf("Expected 6 retries, got %d", callCount)
 	}
 }

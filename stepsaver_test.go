@@ -12,7 +12,7 @@ import (
 var testStepName = "testStep"
 
 func newTestStepSaver() *stepSaver {
-	s := &stepSaver{StepName: testStepName, Uploader: &mockSDStoreUploader{}}
+	s := &stepSaver{StepName: testStepName, Uploader: &mockSDStoreUploader{}, linesPerFile: defaultLinesPerFile}
 	e := json.NewEncoder(s)
 	s.encoder = e
 
@@ -44,7 +44,7 @@ func TestWrite(t *testing.T) {
 		t.Errorf("storePath = %s, want %s", s.logFiles[0].storePath, wantPath)
 	}
 
-	for i := 0; i < linesPerFile-1; i++ {
+	for i := 0; i < defaultLinesPerFile-1; i++ {
 		s.Write([]byte(fmt.Sprintf("Log #%d", i)))
 	}
 	if len(s.logFiles) != 1 {
@@ -122,15 +122,17 @@ func TestSaverUploadOnNewFile(t *testing.T) {
 		localFile string
 	}
 	gotUploads := []upload{}
+	uploadChan := make(chan upload, 10)
 	uploader := &mockSDStoreUploader{
 		upload: func(storePath string, localFile string) error {
-			gotUploads = append(gotUploads, upload{storePath, localFile})
+			// gotUploads = append(gotUploads, upload{storePath, localFile})
+			uploadChan <- upload{storePath, localFile}
 			return nil
 		},
 	}
 
-	s := NewStepSaver(testStepName, uploader)
-	for i := 0; i < linesPerFile; i++ {
+	s := NewStepSaver(testStepName, uploader, defaultLinesPerFile)
+	for i := 0; i < defaultLinesPerFile; i++ {
 		l := &logLine{3456, fmt.Sprintf("LogMsg #%d", i), "step1"}
 		s.WriteLog(l)
 	}
@@ -139,8 +141,14 @@ func TestSaverUploadOnNewFile(t *testing.T) {
 		t.Errorf("Unexpected call to Upload(). len(gotUploads) = %d, want 0", len(gotUploads))
 	}
 
-	l := &logLine{3456, fmt.Sprintf("LogMsg #%d", linesPerFile), "step1"}
+	l := &logLine{3456, fmt.Sprintf("LogMsg #%d", defaultLinesPerFile), "step1"}
 	s.WriteLog(l)
+
+	// Wait just a moment to let other goroutines do their thing
+	time.Sleep(10 * time.Millisecond)
+	for i := 0; i < len(uploadChan); i++ {
+		gotUploads = append(gotUploads, <-uploadChan)
+	}
 
 	if len(gotUploads) != 1 {
 		t.Errorf("Upload not called before writing new file. len(gotUploads) = %d, want 1", len(gotUploads))
@@ -166,8 +174,8 @@ func TestSaverUploadOnTimeElapsed(t *testing.T) {
 	}
 
 	gotUploads := []upload{}
-	s := NewStepSaver(testStepName, uploader)
-	for i := 0; i < linesPerFile; i++ {
+	s := NewStepSaver(testStepName, uploader, defaultLinesPerFile)
+	for i := 0; i < defaultLinesPerFile; i++ {
 		l := &logLine{3456, fmt.Sprintf("LogMsg #%d", i), "step1"}
 		s.WriteLog(l)
 		select {
@@ -184,10 +192,8 @@ func TestSaverUploadOnTimeElapsed(t *testing.T) {
 
 	// We should get a single upload after the interval passes
 	time.Sleep(time.Duration(float32(uploadInterval) * 1.5))
-	select {
-	case u := <-uploadChan:
-		gotUploads = append(gotUploads, u)
-	default:
+	for i := 0; i < len(uploadChan); i++ {
+		gotUploads = append(gotUploads, <-uploadChan)
 	}
 
 	if len(gotUploads) != 1 {
@@ -208,7 +214,7 @@ func TestSaverUploadOnClose(t *testing.T) {
 		},
 	}
 
-	s := NewStepSaver(testStepName, uploader)
+	s := NewStepSaver(testStepName, uploader, defaultLinesPerFile)
 	l := &logLine{4567, fmt.Sprintf("LogMsg #1"), "step1"}
 	s.WriteLog(l)
 

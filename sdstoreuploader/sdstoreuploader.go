@@ -1,16 +1,20 @@
 package sdstoreuploader
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"time"
 )
+
+var retryScaler = 1.0
+
+const maxRetries = 6
 
 // SDStoreUploader is able to upload the contents of a Reader to the SD Store
 type SDStoreUploader interface {
@@ -54,11 +58,17 @@ func (s *sdUploader) Upload(storePath string, filePath string) error {
 		return fmt.Errorf("generating url for file %q to %s", filePath, storePath)
 	}
 
-	err = s.putFile(u, "application/x-ndjson", filePath)
-	if err != nil {
-		return fmt.Errorf("posting file %q to %s: %v", filePath, storePath, err)
+	for i := 0; i < maxRetries; i++ {
+		time.Sleep(time.Duration(float64(i*i)*retryScaler) * time.Second)
+
+		err = s.putFile(u, "application/x-ndjson", filePath)
+		if err != nil {
+			log.Printf("(Try %d of %d) error received from file upload: %v", i+1, maxRetries, err)
+			continue
+		}
+		return nil
 	}
-	return nil
+	return fmt.Errorf("posting file %q to %s after %d retries: %v", filePath, storePath, maxRetries, err)
 }
 
 // makeURL creates the fully-qualified url for a given Store path
@@ -85,12 +95,7 @@ func handleResponse(res *http.Response) ([]byte, error) {
 	}
 
 	if res.StatusCode/100 != 2 {
-		var err SDError
-		parserr := json.Unmarshal(body, &err)
-		if parserr != nil {
-			return nil, fmt.Errorf("unparseable error response from Screwdriver: %v", parserr)
-		}
-		return nil, err
+		return nil, fmt.Errorf("HTTP %d returned: %s", res.StatusCode, body)
 	}
 	return body, nil
 }
