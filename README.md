@@ -23,9 +23,9 @@ $ go test -cover github.com/screwdriver-cd/log-service/...
 
 Code licensed under the BSD 3-Clause license. See LICENSE file for terms.
 
-[issues-image]: https://img.shields.io/github/issues/screwdriver-cd/log-service.svg
-[issues-url]: https://github.com/screwdriver-cd/log-service/issues
-[status-image]: https://cd.screwdriver.cd/pipelines/ce4ddded8b2759e9a06e7fe9735614ce5a7f0ef3/badge
-[status-url]: https://cd.screwdriver.cd/pipelines/ce4ddded8b2759e9a06e7fe9735614ce5a7f0ef3
+[issues-image]: https://img.shields.io/github/issues/screwdriver-cd/screwdriver.svg
+[issues-url]: https://github.com/screwdriver-cd/screwdriver/issues
+[status-image]: https://cd.screwdriver.cd/pipelines/30/badge
+[status-url]: https://cd.screwdriver.cd/pipelines/30
 [goreport-image]: https://goreportcard.com/badge/github.com/screwdriver-cd/log-service
 [goreport-url]: https://goreportcard.com/report/github.com/screwdriver-cd/log-service
