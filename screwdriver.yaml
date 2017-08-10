@@ -6,7 +6,9 @@ shared:
     environment:
         GOPATH: /sd/workspace
         NAME: logservice
+        # space separated GOOS list to build and release
         OS: linux darwin
+        # space separated GOARCH list to build and release
         ARCH: amd64
 
 jobs:
