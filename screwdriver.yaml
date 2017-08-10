@@ -5,39 +5,25 @@ shared:
     image: golang
     environment:
         GOPATH: /sd/workspace
-        NAME: logservice
-        # space separated GOOS list to build and release
-        OS: linux darwin
-        # space separated GOARCH list to build and release
-        ARCH: amd64
 
 jobs:
     main:
         steps:
             - get: go get -t ./...
-            - get-gox: go get github.com/mitchellh/gox
             - vet: go vet ./...
             - gofmt: "find . -name '*.go' | xargs gofmt -s -w"
             - test: go test -race ./...
-            - build: $GOPATH/bin/gox -os "$OS" -arch "$ARCH" -rebuild -output "dist/${NAME}_{{.OS}}_{{.Arch}}"
+            - build: go build -a -o logservice
 
     deploy:
         steps:
             - setup-ci: git clone https://gist.github.com/3d2388b2a7ba658cdcdaffa8cd874e50.git ci
             - get: go get -t ./...
-            - get-gox: go get github.com/mitchellh/gox
             - gofmt: "find . -name '*.go' | xargs gofmt -s -w"
-            - build: $GOPATH/bin/gox -os "$OS" -arch "$ARCH" -rebuild -output "dist/${NAME}_{{.OS}}_{{.Arch}}"
-            - get-bzip2: apt-get update && apt-get install -y --no-install-recommends bzip2
             - tag: ./ci/git-tag.sh
             - release: |
-                cd dist
-                for file in `ls`; do
-                  RELEASE_FILE=$file ./ci/git-release.sh
-                done
-                # Upload linux binary without suffix
-                cp ${NAME}_linux_amd64 $NAME
-                RELEASE_FILE=$NAME ./ci/git-release.sh
+                rm -f ./VERSION
+                curl -sL https://git.io/goreleaser | bash
         secrets:
             # Pushing tags to Git
             - GIT_KEY
