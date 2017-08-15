@@ -1,0 +1,12 @@
+# Compiled files
+
+/logservice
+
+# Generated while deploying
+
+/ci/
+/VERSION
+
+# goreleaser
+
+/dist/
