@@ -138,21 +138,43 @@ func parseLogFile(input *os.File) (logMap, error) {
 	return parseLogData(input)
 }
 
+// Returns a single line (without the ending \n) from the input buffered reader
+// Pulled from https://stackoverflow.com/a/12206365
+func readline(r *bufio.Reader) (string, error) {
+	var (
+		isPrefix = true
+		err      error
+		line, ln []byte
+	)
+
+	for isPrefix && err == nil {
+		line, isPrefix, err = r.ReadLine()
+		ln = append(ln, line...)
+	}
+
+	return string(ln), err
+}
+
 func parseLogData(input io.Reader) (logMap, error) {
 	newLogs := logMap{}
+	var readErr error
+	var line string
 
-	scanner := bufio.NewScanner(input)
-	for scanner.Scan() {
-		line := scanner.Text()
+	reader := bufio.NewReader(input)
+	line, readErr = readline(reader)
+
+	for readErr == nil {
 		newLog := &logLine{}
 		if err := json.Unmarshal([]byte(line), newLog); err != nil {
 			return nil, fmt.Errorf("unmarshaling log line %s: %v", line, err)
 		}
+
 		newLogs[newLog.Step] = append(newLogs[newLog.Step], newLog)
+		line, readErr = readline(reader)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
+	if readErr != nil && readErr.Error() != "EOF" {
+		return nil, readErr
 	}
 
 	return newLogs, nil
