@@ -153,6 +153,23 @@ func safeClose(c io.Closer) error {
 	return c.Close()
 }
 
+// Returns a single line (without the ending \n) from the input buffered reader
+// Pulled from https://stackoverflow.com/a/12206365
+func readln(r *bufio.Reader) (string, error) {
+	var (
+		isPrefix = true
+		err      error
+		line, ln []byte
+	)
+
+	for isPrefix && err == nil {
+		line, isPrefix, err = r.ReadLine()
+		ln = append(ln, line...)
+	}
+
+	return string(ln), err
+}
+
 // ArchiveLogs copies log lines from src into the Screwdriver Store
 // Logs are copied to /builds/:buildId/:stepName/log.N
 func ArchiveLogs(a App) error {
@@ -162,11 +179,13 @@ func ArchiveLogs(a App) error {
 	var lastStep string
 	var stepSaver StepSaver
 	var stepWaitGroup sync.WaitGroup
+	var readErr error
+	var line string
 
-	scanner := bufio.NewScanner(a.LogReader())
-	for scanner.Scan() {
-		line := scanner.Text()
+	reader := bufio.NewReader(a.LogReader())
+	line, readErr = readln(reader)
 
+	for readErr == nil {
 		newLog := &logLine{}
 		if err := json.Unmarshal([]byte(line), newLog); err != nil {
 			return fmt.Errorf("unmarshaling log line %s: %v", line, err)
@@ -190,6 +209,12 @@ func ArchiveLogs(a App) error {
 		if err := stepSaver.WriteLog(newLog); err != nil {
 			return fmt.Errorf("writing logs for step %s: %v", newLog.Step, err)
 		}
+
+		line, readErr = readln(reader)
+	}
+
+	if readErr != nil && readErr.Error() != "EOF" {
+		return fmt.Errorf("reading the line with reader %s: %v", line, readErr)
 	}
 
 	safeClose(stepSaver)
