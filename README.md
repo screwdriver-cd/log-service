@@ -12,7 +12,7 @@ $ go get github.com/screwdriver-cd/log-service
 $ logservice cba94a05f8aa063f4b8cfb62cbc355e0c5f02698
 ```
 
-## Testing
+## Test
 
 ```bash
 $ go get github.com/screwdriver-cd/log-service
