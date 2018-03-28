@@ -120,6 +120,10 @@ func (a app) LogReader() io.Reader {
 		os.Exit(0)
 	}
 
+	// Force blocking IO. This is necessary for readln() to exit on EOF with go 1.9 and
+	// above on darwin. See https://github.com/golang/go/issues/24164 for details
+	source.Fd()
+
 	return source
 }
 
