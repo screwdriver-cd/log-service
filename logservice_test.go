@@ -25,7 +25,7 @@ const (
 	mockEmitterPath  = "./data/emitterdata"
 	mockToken        = "FAKETOKEN"
 	mockBuildID      = "fakebuildid"
-	mockLinesPerFile = 100
+	mockLinesPerFile = 1000
 )
 
 func mockEmitter() *os.File {
