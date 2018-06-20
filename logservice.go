@@ -20,7 +20,7 @@ var (
 )
 
 const (
-	defaultLinesPerFile = 100
+	defaultLinesPerFile = 1000
 	startupTimeout      = 10 * time.Minute
 	logBufferSize       = 200
 	maxLineSize         = 1000
