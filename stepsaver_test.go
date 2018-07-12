@@ -107,7 +107,7 @@ func TestWriteLogTruncate(t *testing.T) {
 	s.encoder = json.NewEncoder(&b)
 
 	msg := strings.Repeat("0", maxLineSize+1)
-	wantMsg := msg[:1000] + fmt.Sprintf(" [line truncated after %d characters]", maxLineSize)
+	wantMsg := msg[:5000] + fmt.Sprintf(" [line truncated after %d characters]", maxLineSize)
 	l := &logLine{3456, msg, "step1"}
 	wantLine := fmt.Sprintf(`{"t":3456,"m":"%s","n":0}`, wantMsg) + "\n"
 	s.WriteLog(l)
