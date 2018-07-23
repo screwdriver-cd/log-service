@@ -34,7 +34,8 @@ func main() {
 // parseFlags returns an App object from CLI flags.
 func parseFlags() app {
 	a := app{}
-	flag.StringVar(&a.url, "api-uri", "", "Base URI for the Screwdriver Store API ($SD_API_URI)")
+	flag.StringVar(&a.apiUrl, "api-uri", "", "Base URI for the Screwdriver API ($SD_API_URL)")
+	flag.StringVar(&a.storeUrl, "store-uri", "", "Base URI for the Screwdriver Store API ($SD_STORE_URL)")
 	flag.StringVar(&a.emitterPath, "emitter", "/var/run/sd/emitter", "Path to the log emitter file")
 	flag.StringVar(&a.buildID, "build", "", "ID of the build that is emitting logs ($SD_BUILDID)")
 	flag.StringVar(&a.token, "token", "", "JWT for authenticating with the Store API ($SD_TOKEN)")
@@ -69,12 +70,16 @@ func parseFlags() app {
 		os.Exit(0)
 	}
 
-	if len(a.url) == 0 {
-		a.url = os.Getenv("SD_API_URI")
+	if len(a.storeUrl) == 0 {
+		a.storeUrl = os.Getenv("SD_STORE_URL")
 	}
 
-	if len(a.url) == 0 {
-		log.Println("No API URI specified. Cannot send logs anywhere.")
+	if len(a.apiUrl) == 0 {
+		a.apiUrl = os.Getenv("SD_API_URL")
+	}
+
+	if len(a.storeUrl) == 0 {
+		log.Println("No STORE API URI specified. Cannot send logs anywhere.")
 		flag.Usage()
 		os.Exit(0)
 	}
@@ -94,13 +99,14 @@ type app struct {
 	token,
 	emitterPath,
 	buildID,
-	url string
+	apiUrl,
+	storeUrl string
 	linesPerFile int
 }
 
 // Uploader returns an Uploader object for the Screwdriver Store
 func (a app) Uploader() sdstoreuploader.SDStoreUploader {
-	return sdstoreuploader.NewFileUploader(a.buildID, a.url, a.token)
+	return sdstoreuploader.NewFileUploader(a.buildID, a.storeUrl, a.token)
 }
 
 // LogReader returns a Reader that is the log source.

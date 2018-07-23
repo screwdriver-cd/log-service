@@ -21,7 +21,8 @@ type logMap map[string][]*logLine
 
 const (
 	defaultEmitter   = "/var/run/sd/emitter"
-	mockURL          = "http://fakeurl"
+	mockStoreURL     = "http://fakeurl"
+	mockAPIURL     = "http://fakeAPIurl"
 	mockEmitterPath  = "./data/emitterdata"
 	mockToken        = "FAKETOKEN"
 	mockBuildID      = "fakebuildid"
@@ -77,7 +78,8 @@ func newRealApp() App {
 
 func newAppFromEmitter(emitterPath string) App {
 	a := app{
-		url:         "http://localhost:8080",
+		storeUrl:         "http://localhost:80",
+		apiUrl:         "http://localhost:8080",
 		emitterPath: emitterPath,
 		buildID:     "build123",
 		token:       "faketoken",
@@ -186,7 +188,8 @@ func parseLogData(input io.Reader) (logMap, error) {
 func TestParseFlags(t *testing.T) {
 	os.Setenv("SD_TOKEN", mockToken)
 	os.Setenv("SD_BUILDID", mockBuildID)
-	os.Setenv("SD_API_URI", mockURL)
+	os.Setenv("SD_STORE_URL", mockStoreURL)
+	os.Setenv("SD_API_URL", mockAPIURL)
 	a := parseFlags()
 	if a.token != mockToken {
 		t.Errorf("App token = %s, want %s", a.token, mockToken)
@@ -200,8 +203,12 @@ func TestParseFlags(t *testing.T) {
 		t.Errorf("Build ID = %s, want %s", a.buildID, mockBuildID)
 	}
 
-	if a.url != mockURL {
-		t.Errorf("URL = %s, want %s", a.url, mockURL)
+	if a.storeUrl != mockStoreURL {
+		t.Errorf("URL = %s, want %s", a.storeUrl, mockStoreURL)
+	}
+
+	if a.apiUrl != mockAPIURL {
+		t.Errorf("URL = %s, want %s", a.apiUrl, mockAPIURL)
 	}
 
 	if a.linesPerFile != mockLinesPerFile {
