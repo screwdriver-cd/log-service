@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/screwdriver-cd/log-service/sdstoreuploader"
+	"github.com/screwdriver-cd/log-service/screwdriver"
 )
 
 var (
@@ -28,6 +29,7 @@ const (
 
 func main() {
 	a := App(parseFlags())
+
 	run(a)
 }
 
@@ -78,6 +80,12 @@ func parseFlags() app {
 		a.apiUrl = os.Getenv("SD_API_URL")
 	}
 
+	if len(a.apiUrl) == 0 {
+		log.Println("No API URI specified. Cannot update lines for step.")
+		flag.Usage()
+		os.Exit(0)
+	}
+
 	if len(a.storeUrl) == 0 {
 		log.Println("No STORE API URI specified. Cannot send logs anywhere.")
 		flag.Usage()
@@ -91,6 +99,7 @@ func parseFlags() app {
 type App interface {
 	LogReader() io.Reader
 	Uploader() sdstoreuploader.SDStoreUploader
+	ScrewdriverAPI() screwdriver.API
 	BuildID() string
 	StepSaver(step string) StepSaver
 }
@@ -107,6 +116,16 @@ type app struct {
 // Uploader returns an Uploader object for the Screwdriver Store
 func (a app) Uploader() sdstoreuploader.SDStoreUploader {
 	return sdstoreuploader.NewFileUploader(a.buildID, a.storeUrl, a.token)
+}
+
+func (a app) ScrewdriverAPI() screwdriver.API {
+	api, err := screwdriver.New(a.buildID, a.apiUrl, a.token)
+	if err != nil {
+		log.Printf("Error creating Screwdriver API %v: %v", a.buildID, err)
+		os.Exit(0)
+	}
+
+	return api
 }
 
 // LogReader returns a Reader that is the log source.
@@ -135,7 +154,7 @@ func (a app) LogReader() io.Reader {
 
 // StepSaver returns a new StepSaver object based on the app config
 func (a app) StepSaver(step string) StepSaver {
-	return NewStepSaver(step, a.Uploader(), a.linesPerFile)
+	return NewStepSaver(step, a.Uploader(), a.linesPerFile, a.ScrewdriverAPI())
 }
 
 // BuildID returns the id of the build being processed.

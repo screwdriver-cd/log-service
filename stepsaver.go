@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/screwdriver-cd/log-service/sdstoreuploader"
+	"github.com/screwdriver-cd/log-service/screwdriver"
 )
 
 // logLine is a representation of log lines coming from the Screwdriver launcher
@@ -34,6 +35,7 @@ type StepSaver interface {
 type stepSaver struct {
 	StepName       string
 	Uploader       sdstoreuploader.SDStoreUploader
+	ScrewdriverAPI screwdriver.API
 	lineCount      int
 	savedLineCount int
 	logFiles       []*logFile
@@ -59,6 +61,12 @@ func (s *stepSaver) Close() error {
 	}
 
 	log.Println("Completed step processing for", s.StepName)
+
+	if err = s.ScrewdriverAPI.UpdateStepLines(s.StepName, s.lineCount); err != nil {
+		return fmt.Errorf("Updating step meta lines: %v", err)
+	}
+
+	log.Println("Set step lines to", s.lineCount)
 
 	return nil
 }
@@ -161,8 +169,8 @@ func (s *stepSaver) Save() error {
 }
 
 // NewStepSaver creates a StepSaver out of a name and sdstoreuploader.SDStoreUploader
-func NewStepSaver(name string, uploader sdstoreuploader.SDStoreUploader, linesPerFile int) StepSaver {
-	s := &stepSaver{StepName: name, Uploader: uploader, ticker: time.NewTicker(uploadInterval), linesPerFile: linesPerFile}
+func NewStepSaver(name string, uploader sdstoreuploader.SDStoreUploader, linesPerFile int, screwdriverAPI screwdriver.API) StepSaver {
+	s := &stepSaver{StepName: name, Uploader: uploader, ticker: time.NewTicker(uploadInterval), linesPerFile: linesPerFile, ScrewdriverAPI: screwdriverAPI}
 	e := json.NewEncoder(s)
 	s.encoder = e
 
