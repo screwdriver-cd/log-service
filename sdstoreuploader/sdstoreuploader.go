@@ -34,7 +34,7 @@ func NewFileUploader(buildID, url, token string) SDStoreUploader {
 		buildID,
 		url,
 		token,
-		&http.Client{Timeout: 10 * time.Second},
+		&http.Client{Timeout: 60 * time.Second},
 	}
 }
 
