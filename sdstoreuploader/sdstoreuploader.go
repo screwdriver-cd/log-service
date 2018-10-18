@@ -78,7 +78,7 @@ func (s *sdUploader) makeURL(storePath string) (*url.URL, error) {
 		return nil, fmt.Errorf("bad url %s: %v", s.url, err)
 	}
 	version := "v1"
-	u.Path = path.Join(version, u.Path, "builds", s.buildID, storePath)
+	u.Path = path.Join(u.Path, version, "builds", s.buildID, storePath)
 
 	return u, nil
 }
