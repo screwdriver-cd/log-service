@@ -8,10 +8,13 @@ import (
 const logFile string = "/sd/workspace/artifacts/build.log"
 
 type sdLocalUploader struct {
+	logFile string
 }
 
-func NewFileUploader() SDStoreUploader {
-	return &sdLocalUploader{}
+func NewLocalUploader() SDStoreUploader {
+	return &sdLocalUploader{
+		logFile: logFile,
+	}
 }
 
 func (s *sdLocalUploader) Upload(path string, filePath string) error {
@@ -21,7 +24,7 @@ func (s *sdLocalUploader) Upload(path string, filePath string) error {
 	}
 	defer input.Close()
 
-	output, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	output, err := os.OpenFile(s.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}

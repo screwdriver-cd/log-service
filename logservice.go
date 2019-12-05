@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/screwdriver-cd/log-service/sdstoreuploader"
 	"github.com/screwdriver-cd/log-service/screwdriver"
+	"github.com/screwdriver-cd/log-service/sdstoreuploader"
 )
 
 var (
@@ -42,6 +42,7 @@ func parseFlags() app {
 	flag.StringVar(&a.buildID, "build", "", "ID of the build that is emitting logs ($SD_BUILDID)")
 	flag.StringVar(&a.token, "token", "", "JWT for authenticating with the Store API ($SD_TOKEN)")
 	flag.IntVar(&a.linesPerFile, "lines-per-file", defaultLinesPerFile, "Max number of lines per file when uploading ($SD_LINESPERFILE)")
+	flag.BoolVar(&a.isLocal, "local-mode", false, "Build run in local mode")
 	flag.Parse()
 
 	if len(a.token) == 0 {
@@ -111,11 +112,16 @@ type app struct {
 	apiUrl,
 	storeUrl string
 	linesPerFile int
+	isLocal      bool
 }
 
 // Uploader returns an Uploader object for the Screwdriver Store
 func (a app) Uploader() sdstoreuploader.SDStoreUploader {
-	return sdstoreuploader.NewFileUploader(a.buildID, a.storeUrl, a.token)
+	if a.isLocal {
+		return sdstoreuploader.NewLocalUploader()
+	} else {
+		return sdstoreuploader.NewFileUploader(a.buildID, a.storeUrl, a.token)
+	}
 }
 
 func (a app) ScrewdriverAPI() screwdriver.API {
