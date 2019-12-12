@@ -75,9 +75,10 @@ func (s *stepSaver) Close() error {
 // It splits logs into pieces and uploads them separately and incrementally.
 func (s *stepSaver) WriteLog(l *logLine) error {
 	storedLine := storedLogLine{
-		Time:    l.Time,
-		Message: l.Message,
-		Line:    s.lineCount,
+		Time:       l.Time,
+		Message:    l.Message,
+		Line:       s.lineCount,
+		StepName:   l.Step,
 	}
 
 	if len(storedLine.Message) > maxLineSize {

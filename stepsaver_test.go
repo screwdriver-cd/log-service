@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"debug"
 )
 
 var testStepName = "testStep"
@@ -46,6 +47,7 @@ func newTestStepSaver() *stepSaver {
 	e := json.NewEncoder(s)
 	s.encoder = e
 
+	fmt.Printf("%v", s);
 	return s
 }
 
@@ -124,7 +126,7 @@ func TestWriteLogLong(t *testing.T) {
 
 	msg := strings.Repeat("0", maxLineSize)
 	l := &logLine{3456, msg, "step1"}
-	wantLine := fmt.Sprintf(`{"t":3456,"m":"%s","n":0}`, msg) + "\n"
+	wantLine := fmt.Sprintf(`{"t":3456,"m":"%s","n":0,"s":"step1"}`, msg) + "\n"
 	s.WriteLog(l)
 	if b.String() != wantLine {
 		t.Errorf("buffer = %s, want %s", b.String(), wantLine)
@@ -139,7 +141,7 @@ func TestWriteLogTruncate(t *testing.T) {
 	msg := strings.Repeat("0", maxLineSize+1)
 	wantMsg := msg[:5000] + fmt.Sprintf(" [line truncated after %d characters]", maxLineSize)
 	l := &logLine{3456, msg, "step1"}
-	wantLine := fmt.Sprintf(`{"t":3456,"m":"%s","n":0}`, wantMsg) + "\n"
+	wantLine := fmt.Sprintf(`{"t":3456,"m":"%s","n":0,"s":"step1"}`, wantMsg) + "\n"
 	s.WriteLog(l)
 	if b.String() != wantLine {
 		t.Errorf("buffer = %s, want %s", b.String(), wantLine)
