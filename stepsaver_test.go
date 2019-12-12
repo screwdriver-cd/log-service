@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"debug"
 )
 
 var testStepName = "testStep"
@@ -47,7 +46,6 @@ func newTestStepSaver() *stepSaver {
 	e := json.NewEncoder(s)
 	s.encoder = e
 
-	fmt.Printf("%v", s);
 	return s
 }
 
@@ -112,7 +110,7 @@ func TestWriteLog(t *testing.T) {
 	b := bytes.Buffer{}
 	s.encoder = json.NewEncoder(&b)
 	l = &logLine{2345, "TestLine2", "step1"}
-	wantLine := `{"t":2345,"m":"TestLine2","n":1}` + "\n"
+	wantLine := `{"t":2345,"m":"TestLine2","n":1,"s":"step1"}` + "\n"
 	s.WriteLog(l)
 	if b.String() != wantLine {
 		t.Errorf("buffer = %s, want %s", b.String(), wantLine)
