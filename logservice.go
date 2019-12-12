@@ -43,6 +43,7 @@ func parseFlags() app {
 	flag.StringVar(&a.token, "token", "", "JWT for authenticating with the Store API ($SD_TOKEN)")
 	flag.IntVar(&a.linesPerFile, "lines-per-file", defaultLinesPerFile, "Max number of lines per file when uploading ($SD_LINESPERFILE)")
 	flag.BoolVar(&a.isLocal, "local-mode", false, "Build run in local mode")
+	flag.StringVar(&a.artifactsDir, "artifacts-dir", "", "Path to the Artifacts directory in local mode")
 	flag.Parse()
 
 	if len(a.token) == 0 {
@@ -93,6 +94,12 @@ func parseFlags() app {
 		os.Exit(0)
 	}
 
+	if a.isLocal && len(a.artifactsDir) == 0 {
+		log.Println("No Artifacts directory specified. Cannot write logs anywhere in local mode.")
+		flag.Usage()
+		os.Exit(0)
+	}
+
 	return a
 }
 
@@ -110,7 +117,8 @@ type app struct {
 	emitterPath,
 	buildID,
 	apiUrl,
-	storeUrl string
+	storeUrl,
+	artifactsDir string
 	linesPerFile int
 	isLocal      bool
 }
@@ -118,7 +126,7 @@ type app struct {
 // Uploader returns an Uploader object for the Screwdriver Store
 func (a app) Uploader() sdstoreuploader.SDStoreUploader {
 	if a.isLocal {
-		return sdstoreuploader.NewLocalUploader()
+		return sdstoreuploader.NewLocalUploader(a.artifactsDir)
 	} else {
 		return sdstoreuploader.NewFileUploader(a.buildID, a.storeUrl, a.token)
 	}

@@ -4,8 +4,25 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 )
+
+func TestNewLocalUploader(t *testing.T) {
+	expected := &sdLocalUploader{
+		logFile: "test/build.log",
+	}
+
+	actual := NewLocalUploader("test")
+
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf(
+			"There are something wrong with sdLocalUploader\nexpected: %v \nactual: %v",
+			expected,
+			actual,
+		)
+	}
+}
 
 func TestWriteLog(t *testing.T) {
 	testLogFile, err := ioutil.TempFile("", "build.log")

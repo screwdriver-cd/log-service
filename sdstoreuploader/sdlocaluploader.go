@@ -5,15 +5,15 @@ import (
 	"os"
 )
 
-const logFile string = "/sd/workspace/artifacts/build.log"
+const logFileName string = "build.log"
 
 type sdLocalUploader struct {
 	logFile string
 }
 
-func NewLocalUploader() SDStoreUploader {
+func NewLocalUploader(artifactsDir string) SDStoreUploader {
 	return &sdLocalUploader{
-		logFile: logFile,
+		logFile: artifactsDir + "/" + logFileName,
 	}
 }
 
