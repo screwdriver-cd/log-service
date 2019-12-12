@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/screwdriver-cd/log-service/screwdriver"
-	"github.com/screwdriver-cd/log-service/sdstoreuploader"
+	"github.com/screwdriver-cd/log-service/sduploader"
 )
 
 var (
@@ -106,7 +106,7 @@ func parseFlags() app {
 // App implements the main App's interface
 type App interface {
 	LogReader() io.Reader
-	Uploader() sdstoreuploader.SDStoreUploader
+	Uploader() sduploader.SDUploader
 	ScrewdriverAPI() screwdriver.API
 	BuildID() string
 	StepSaver(step string) StepSaver
@@ -124,11 +124,11 @@ type app struct {
 }
 
 // Uploader returns an Uploader object for the Screwdriver Store
-func (a app) Uploader() sdstoreuploader.SDStoreUploader {
+func (a app) Uploader() sduploader.SDUploader {
 	if a.isLocal {
-		return sdstoreuploader.NewLocalUploader(a.artifactsDir)
+		return sduploader.NewLocalUploader(a.artifactsDir)
 	} else {
-		return sdstoreuploader.NewFileUploader(a.buildID, a.storeUrl, a.token)
+		return sduploader.NewStoreUploader(a.buildID, a.storeUrl, a.token)
 	}
 }
 

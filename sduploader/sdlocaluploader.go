@@ -1,4 +1,4 @@
-package sdstoreuploader
+package sduploader
 
 import (
 	"io"
@@ -11,7 +11,7 @@ type sdLocalUploader struct {
 	logFile string
 }
 
-func NewLocalUploader(artifactsDir string) SDStoreUploader {
+func NewLocalUploader(artifactsDir string) SDUploader {
 	return &sdLocalUploader{
 		logFile: artifactsDir + "/" + logFileName,
 	}

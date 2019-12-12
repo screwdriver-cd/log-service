@@ -1,4 +1,4 @@
-package sdstoreuploader
+package sduploader
 
 import (
 	"bytes"

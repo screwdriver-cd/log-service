@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/screwdriver-cd/log-service/screwdriver"
-	"github.com/screwdriver-cd/log-service/sdstoreuploader"
+	"github.com/screwdriver-cd/log-service/sduploader"
 )
 
 // logLine is a representation of log lines coming from the Screwdriver launcher
@@ -34,7 +34,7 @@ type StepSaver interface {
 
 type stepSaver struct {
 	StepName       string
-	Uploader       sdstoreuploader.SDStoreUploader
+	Uploader       sduploader.SDUploader
 	ScrewdriverAPI screwdriver.API
 	lineCount      int
 	savedLineCount int
@@ -169,8 +169,8 @@ func (s *stepSaver) Save() error {
 	return nil
 }
 
-// NewStepSaver creates a StepSaver out of a name and sdstoreuploader.SDStoreUploader
-func NewStepSaver(name string, uploader sdstoreuploader.SDStoreUploader, linesPerFile int, screwdriverAPI screwdriver.API) StepSaver {
+// NewStepSaver creates a StepSaver out of a name and sduploader.SDUploader
+func NewStepSaver(name string, uploader sduploader.SDUploader, linesPerFile int, screwdriverAPI screwdriver.API) StepSaver {
 	s := &stepSaver{StepName: name, Uploader: uploader, ticker: time.NewTicker(uploadInterval), linesPerFile: linesPerFile, ScrewdriverAPI: screwdriverAPI}
 	e := json.NewEncoder(s)
 	s.encoder = e

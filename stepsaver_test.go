@@ -42,7 +42,7 @@ func (m MockAPI) UpdateStepLines(stepName string, lineCount int) error {
 }
 
 func newTestStepSaver() *stepSaver {
-	s := &stepSaver{StepName: testStepName, Uploader: &mockSDStoreUploader{}, ScrewdriverAPI: &MockAPI{}, linesPerFile: defaultLinesPerFile}
+	s := &stepSaver{StepName: testStepName, Uploader: &mockSDUploader{}, ScrewdriverAPI: &MockAPI{}, linesPerFile: defaultLinesPerFile}
 	e := json.NewEncoder(s)
 	s.encoder = e
 
@@ -153,7 +153,7 @@ func TestSaverUploadOnNewFile(t *testing.T) {
 	}
 	gotUploads := []upload{}
 	uploadChan := make(chan upload, 10)
-	uploader := &mockSDStoreUploader{
+	uploader := &mockSDUploader{
 		upload: func(storePath string, localFile string) error {
 			// gotUploads = append(gotUploads, upload{storePath, localFile})
 			uploadChan <- upload{storePath, localFile}
@@ -197,7 +197,7 @@ func TestSaverUploadOnTimeElapsed(t *testing.T) {
 	}
 
 	uploadChan := make(chan upload, 1)
-	uploader := &mockSDStoreUploader{
+	uploader := &mockSDUploader{
 		upload: func(storePath string, localFile string) error {
 			uploadChan <- upload{storePath, localFile}
 			return nil
@@ -239,7 +239,7 @@ func TestSaverUploadOnClose(t *testing.T) {
 		localFile string
 	}
 	gotUploads := []upload{}
-	uploader := &mockSDStoreUploader{
+	uploader := &mockSDUploader{
 		upload: func(storePath string, localFile string) error {
 			gotUploads = append(gotUploads, upload{storePath, localFile})
 			return nil

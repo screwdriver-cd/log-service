@@ -1,4 +1,4 @@
-package sdstoreuploader
+package sduploader
 
 import (
 	"bytes"
@@ -62,7 +62,7 @@ func TestFileUpload(t *testing.T) {
 	url := "http://fakeurl"
 	token := "faketoken"
 	testPath := "test/path/1"
-	uploader := &sdUploader{
+	uploader := &sdStoreUploader{
 		testBuildID,
 		url,
 		token,
@@ -118,7 +118,7 @@ func TestFileUploadRetry(t *testing.T) {
 	url := "http://fakeurl"
 	token := "faketoken"
 	testPath := "test/path/1"
-	uploader := &sdUploader{
+	uploader := &sdStoreUploader{
 		testBuildID,
 		url,
 		token,

@@ -1,4 +1,4 @@
-package sdstoreuploader
+package sduploader
 
 import (
 	"fmt"
@@ -16,21 +16,21 @@ var retryScaler = 1.0
 
 const maxRetries = 6
 
-// SDStoreUploader is able to upload the contents of a Reader to the SD Store
-type SDStoreUploader interface {
+// SDUploader is able to upload the contents of a Reader to the SD Store
+type SDUploader interface {
 	Upload(path string, filePath string) error
 }
 
-type sdUploader struct {
+type sdStoreUploader struct {
 	buildID string
 	url     string
 	token   string
 	client  *http.Client
 }
 
-// NewFileUploader returns an SDStoreUploader for a given build.
-func NewFileUploader(buildID, url, token string) SDStoreUploader {
-	return &sdUploader{
+// NewStoreUploader returns an SDUploader for a given build.
+func NewStoreUploader(buildID, url, token string) SDUploader {
+	return &sdStoreUploader{
 		buildID,
 		url,
 		token,
@@ -52,7 +52,7 @@ func (e SDError) Error() string {
 
 // Uploads sends a file to a path within the SD Store. The path is relative to
 // the build path within the SD Store, e.g. http://store.screwdriver.cd/builds/abc/<storePath>
-func (s *sdUploader) Upload(storePath string, filePath string) error {
+func (s *sdStoreUploader) Upload(storePath string, filePath string) error {
 	u, err := s.makeURL(storePath)
 	if err != nil {
 		return fmt.Errorf("generating url for file %q to %s", filePath, storePath)
@@ -72,7 +72,7 @@ func (s *sdUploader) Upload(storePath string, filePath string) error {
 }
 
 // makeURL creates the fully-qualified url for a given Store path
-func (s *sdUploader) makeURL(storePath string) (*url.URL, error) {
+func (s *sdStoreUploader) makeURL(storePath string) (*url.URL, error) {
 	u, err := url.Parse(s.url)
 	if err != nil {
 		return nil, fmt.Errorf("bad url %s: %v", s.url, err)
@@ -102,7 +102,7 @@ func handleResponse(res *http.Response) ([]byte, error) {
 
 // putFile writes a file at filePath to a url with a PUT request. It streams the data
 // from disk to save memory
-func (s *sdUploader) putFile(url *url.URL, bodyType string, filePath string) error {
+func (s *sdStoreUploader) putFile(url *url.URL, bodyType string, filePath string) error {
 	input, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -136,7 +136,7 @@ func (s *sdUploader) putFile(url *url.URL, bodyType string, filePath string) err
 	return <-done
 }
 
-func (s *sdUploader) put(url *url.URL, bodyType string, payload io.Reader, size int64) ([]byte, error) {
+func (s *sdStoreUploader) put(url *url.URL, bodyType string, payload io.Reader, size int64) ([]byte, error) {
 	req, err := http.NewRequest("PUT", url.String(), payload)
 	if err != nil {
 		return nil, err

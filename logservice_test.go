@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/screwdriver-cd/log-service/screwdriver"
-	"github.com/screwdriver-cd/log-service/sdstoreuploader"
+	"github.com/screwdriver-cd/log-service/sduploader"
 )
 
 // ----------------------------------------------------------------------------
@@ -57,11 +57,11 @@ func (s mockStepSaver) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-type mockSDStoreUploader struct {
+type mockSDUploader struct {
 	upload func(string, string) error
 }
 
-func (m *mockSDStoreUploader) Upload(path string, filePath string) error {
+func (m *mockSDUploader) Upload(path string, filePath string) error {
 	if m.upload != nil {
 		return m.upload(path, filePath)
 	}
@@ -103,9 +103,9 @@ func newAppFromEmitter(emitterPath string) App {
 type mockApp struct {
 	run            func()
 	logReader      func() io.Reader
-	uploader       func() sdstoreuploader.SDStoreUploader
+	uploader       func() sduploader.SDUploader
 	screwdriverAPI func() screwdriver.API
-	archiveLogs    func(uploader sdstoreuploader.SDStoreUploader, src io.Reader) error
+	archiveLogs    func(uploader sduploader.SDUploader, src io.Reader) error
 	stepSaver      func(step string) StepSaver
 	buildID        string
 }
@@ -124,12 +124,12 @@ func (a mockApp) LogReader() io.Reader {
 	return mockEmitter()
 }
 
-func (a mockApp) Uploader() sdstoreuploader.SDStoreUploader {
+func (a mockApp) Uploader() sduploader.SDUploader {
 	if a.uploader != nil {
 		return a.uploader()
 	}
 
-	return &mockSDStoreUploader{}
+	return &mockSDUploader{}
 }
 
 func (a mockApp) ScrewdriverAPI() screwdriver.API {
