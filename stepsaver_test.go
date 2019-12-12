@@ -31,7 +31,7 @@ func mockAPI(t *testing.T, testStepName string) MockAPI {
 }
 
 type MockAPI struct {
-	updateStepLines   func(stepName string, lineCount int) error
+	updateStepLines func(stepName string, lineCount int) error
 }
 
 func (m MockAPI) UpdateStepLines(stepName string, lineCount int) error {

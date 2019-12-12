@@ -13,10 +13,10 @@ import (
 
 // storedLogLine is a representation of logs for permanent storage in the Store
 type storedLogLine struct {
-	Time        int64  `json:"t"`
-	Message     string `json:"m"`
-	Line        int    `json:"n"`
-	StepName    string `json:"s"`
+	Time     int64  `json:"t"`
+	Message  string `json:"m"`
+	Line     int    `json:"n"`
+	StepName string `json:"s"`
 }
 
 type logFile struct {

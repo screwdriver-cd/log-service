@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/screwdriver-cd/log-service/sdstoreuploader"
 	"github.com/screwdriver-cd/log-service/screwdriver"
+	"github.com/screwdriver-cd/log-service/sdstoreuploader"
 )
 
 // logLine is a representation of log lines coming from the Screwdriver launcher
@@ -75,10 +75,10 @@ func (s *stepSaver) Close() error {
 // It splits logs into pieces and uploads them separately and incrementally.
 func (s *stepSaver) WriteLog(l *logLine) error {
 	storedLine := storedLogLine{
-		Time:       l.Time,
-		Message:    l.Message,
-		Line:       s.lineCount,
-		StepName:   l.Step,
+		Time:     l.Time,
+		Message:  l.Message,
+		Line:     s.lineCount,
+		StepName: l.Step,
 	}
 
 	if len(storedLine.Message) > maxLineSize {
