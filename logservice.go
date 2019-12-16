@@ -133,7 +133,13 @@ func (a app) Uploader() sduploader.SDUploader {
 }
 
 func (a app) ScrewdriverAPI() screwdriver.API {
-	api, err := screwdriver.New(a.buildID, a.apiUrl, a.token)
+	var api screwdriver.API
+	var err error
+	if a.isLocal {
+		api, err = screwdriver.NewLocal()
+	} else {
+		api, err = screwdriver.New(a.buildID, a.apiUrl, a.token)
+	}
 	if err != nil {
 		log.Printf("Error creating Screwdriver API %v: %v", a.buildID, err)
 		os.Exit(0)
