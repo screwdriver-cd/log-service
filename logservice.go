@@ -46,6 +46,23 @@ func parseFlags() app {
 	flag.StringVar(&a.buildLogFile, "build-log-file", "", "Path to the build log file in local mode")
 	flag.Parse()
 
+	if len(os.Getenv("SD_LINESPERFILE")) != 0 {
+		l, err := strconv.Atoi(os.Getenv("SD_LINESPERFILE"))
+		a.linesPerFile = l
+		if err != nil {
+			log.Println("Bad value for $SD_LINESPERFILE")
+		}
+	}
+
+	if a.isLocal {
+		if len(a.buildLogFile) == 0 {
+			log.Println("No build log file in local mode specified. Cannot write logs anywhere in local mode.")
+			flag.Usage()
+			os.Exit(0)
+		}
+		return a
+	}
+
 	if len(a.token) == 0 {
 		a.token = os.Getenv("SD_TOKEN")
 	}
@@ -54,14 +71,6 @@ func parseFlags() app {
 		log.Println("No JWT specified. Cannot upload.")
 		flag.Usage()
 		os.Exit(0)
-	}
-
-	if len(os.Getenv("SD_LINESPERFILE")) != 0 {
-		l, err := strconv.Atoi(os.Getenv("SD_LINESPERFILE"))
-		a.linesPerFile = l
-		if err != nil {
-			log.Println("Bad value for $SD_LINESPERFILE")
-		}
 	}
 
 	if len(a.buildID) == 0 {
@@ -90,12 +99,6 @@ func parseFlags() app {
 
 	if len(a.storeUrl) == 0 {
 		log.Println("No STORE API URI specified. Cannot send logs anywhere.")
-		flag.Usage()
-		os.Exit(0)
-	}
-
-	if a.isLocal && len(a.buildLogFile) == 0 {
-		log.Println("No build log file in local mode specified. Cannot write logs anywhere in local mode.")
 		flag.Usage()
 		os.Exit(0)
 	}
