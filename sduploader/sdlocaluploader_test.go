@@ -10,10 +10,10 @@ import (
 
 func TestNewLocalUploader(t *testing.T) {
 	expected := &sdLocalUploader{
-		logFile: "test/build.log",
+		logFile: "test/.sd-local",
 	}
 
-	actual := NewLocalUploader("test")
+	actual := NewLocalUploader("test/.sd-local")
 
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf(

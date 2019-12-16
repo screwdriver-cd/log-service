@@ -5,15 +5,13 @@ import (
 	"os"
 )
 
-const logFileName string = "build.log"
-
 type sdLocalUploader struct {
 	logFile string
 }
 
-func NewLocalUploader(artifactsDir string) SDUploader {
+func NewLocalUploader(logFile string) SDUploader {
 	return &sdLocalUploader{
-		logFile: artifactsDir + "/" + logFileName,
+		logFile: logFile,
 	}
 }
 
