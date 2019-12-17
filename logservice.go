@@ -48,9 +48,10 @@ func parseFlags() app {
 
 	if len(os.Getenv("SD_LINESPERFILE")) != 0 {
 		l, err := strconv.Atoi(os.Getenv("SD_LINESPERFILE"))
-		a.linesPerFile = l
 		if err != nil {
 			log.Println("Bad value for $SD_LINESPERFILE")
+		} else {
+			a.linesPerFile = l
 		}
 	}
 
