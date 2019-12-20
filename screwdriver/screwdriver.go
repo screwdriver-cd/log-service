@@ -25,9 +25,9 @@ type API interface {
 
 // SDError is an error response from the Screwdriver API
 type SDError struct {
-	StatusCode int	`json:"statusCode"`
-	Reason	 string `json:"error"`
-	Message	string `json:"message"`
+	StatusCode int    `json:"statusCode"`
+	Reason     string `json:"error"`
+	Message    string `json:"message"`
 }
 
 func (e SDError) Error() string {
@@ -37,8 +37,8 @@ func (e SDError) Error() string {
 type api struct {
 	buildID string
 	baseURL string
-	token	string
-	client	*http.Client
+	token   string
+	client  *http.Client
 }
 
 // New returns a new API object

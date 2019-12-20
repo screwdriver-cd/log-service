@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/screwdriver-cd/log-service/sdstoreuploader"
 	"github.com/screwdriver-cd/log-service/screwdriver"
+	"github.com/screwdriver-cd/log-service/sduploader"
 )
 
 var (
@@ -42,7 +42,27 @@ func parseFlags() app {
 	flag.StringVar(&a.buildID, "build", "", "ID of the build that is emitting logs ($SD_BUILDID)")
 	flag.StringVar(&a.token, "token", "", "JWT for authenticating with the Store API ($SD_TOKEN)")
 	flag.IntVar(&a.linesPerFile, "lines-per-file", defaultLinesPerFile, "Max number of lines per file when uploading ($SD_LINESPERFILE)")
+	flag.BoolVar(&a.isLocal, "local-mode", false, "Build run in local mode")
+	flag.StringVar(&a.buildLogFile, "build-log-file", "", "Path to the build log file in local mode")
 	flag.Parse()
+
+	if len(os.Getenv("SD_LINESPERFILE")) != 0 {
+		l, err := strconv.Atoi(os.Getenv("SD_LINESPERFILE"))
+		if err != nil {
+			log.Println("Bad value for $SD_LINESPERFILE")
+		} else {
+			a.linesPerFile = l
+		}
+	}
+
+	if a.isLocal {
+		if len(a.buildLogFile) == 0 {
+			log.Println("No build log file in local mode specified. Cannot write logs anywhere in local mode.")
+			flag.Usage()
+			os.Exit(0)
+		}
+		return a
+	}
 
 	if len(a.token) == 0 {
 		a.token = os.Getenv("SD_TOKEN")
@@ -52,14 +72,6 @@ func parseFlags() app {
 		log.Println("No JWT specified. Cannot upload.")
 		flag.Usage()
 		os.Exit(0)
-	}
-
-	if len(os.Getenv("SD_LINESPERFILE")) != 0 {
-		l, err := strconv.Atoi(os.Getenv("SD_LINESPERFILE"))
-		a.linesPerFile = l
-		if err != nil {
-			log.Println("Bad value for $SD_LINESPERFILE")
-		}
 	}
 
 	if len(a.buildID) == 0 {
@@ -98,7 +110,7 @@ func parseFlags() app {
 // App implements the main App's interface
 type App interface {
 	LogReader() io.Reader
-	Uploader() sdstoreuploader.SDStoreUploader
+	Uploader() sduploader.SDUploader
 	ScrewdriverAPI() screwdriver.API
 	BuildID() string
 	StepSaver(step string) StepSaver
@@ -109,17 +121,29 @@ type app struct {
 	emitterPath,
 	buildID,
 	apiUrl,
-	storeUrl string
+	storeUrl,
+	buildLogFile string
 	linesPerFile int
+	isLocal      bool
 }
 
 // Uploader returns an Uploader object for the Screwdriver Store
-func (a app) Uploader() sdstoreuploader.SDStoreUploader {
-	return sdstoreuploader.NewFileUploader(a.buildID, a.storeUrl, a.token)
+func (a app) Uploader() sduploader.SDUploader {
+	if a.isLocal {
+		return sduploader.NewLocalUploader(a.buildLogFile)
+	} else {
+		return sduploader.NewStoreUploader(a.buildID, a.storeUrl, a.token)
+	}
 }
 
 func (a app) ScrewdriverAPI() screwdriver.API {
-	api, err := screwdriver.New(a.buildID, a.apiUrl, a.token)
+	var api screwdriver.API
+	var err error
+	if a.isLocal {
+		api, err = screwdriver.NewLocal()
+	} else {
+		api, err = screwdriver.New(a.buildID, a.apiUrl, a.token)
+	}
 	if err != nil {
 		log.Printf("Error creating Screwdriver API %v: %v", a.buildID, err)
 		os.Exit(0)

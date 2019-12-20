@@ -8,14 +8,15 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/screwdriver-cd/log-service/sdstoreuploader"
+	"github.com/screwdriver-cd/log-service/sduploader"
 )
 
 // storedLogLine is a representation of logs for permanent storage in the Store
 type storedLogLine struct {
-	Time    int64  `json:"t"`
-	Message string `json:"m"`
-	Line    int    `json:"n"`
+	Time     int64  `json:"t"`
+	Message  string `json:"m"`
+	Line     int    `json:"n"`
+	StepName string `json:"s"`
 }
 
 type logFile struct {
@@ -23,12 +24,12 @@ type logFile struct {
 	savedLineCount int
 	mutex          *sync.RWMutex
 	storePath      string
-	uploader       sdstoreuploader.SDStoreUploader
+	uploader       sduploader.SDUploader
 	file           *os.File
 }
 
 // newLogFile returns a logFile object for saving a single file to the Store.
-func newLogFile(uploader sdstoreuploader.SDStoreUploader, storePath string) (*logFile, error) {
+func newLogFile(uploader sduploader.SDUploader, storePath string) (*logFile, error) {
 	file, err := ioutil.TempFile("/sd", filepath.Base(storePath))
 	if err != nil {
 		return &logFile{}, fmt.Errorf("creating temporary file for %s: %v", storePath, err)

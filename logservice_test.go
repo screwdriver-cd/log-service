@@ -11,8 +11,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/screwdriver-cd/log-service/sdstoreuploader"
 	"github.com/screwdriver-cd/log-service/screwdriver"
+	"github.com/screwdriver-cd/log-service/sduploader"
 )
 
 // ----------------------------------------------------------------------------
@@ -23,7 +23,7 @@ type logMap map[string][]*logLine
 const (
 	defaultEmitter   = "/var/run/sd/emitter"
 	mockStoreURL     = "http://fakeurl"
-	mockAPIURL     = "http://fakeAPIurl"
+	mockAPIURL       = "http://fakeAPIurl"
 	mockEmitterPath  = "./data/emitterdata"
 	mockToken        = "FAKETOKEN"
 	mockBuildID      = "fakebuildid"
@@ -57,11 +57,11 @@ func (s mockStepSaver) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-type mockSDStoreUploader struct {
+type mockSDUploader struct {
 	upload func(string, string) error
 }
 
-func (m *mockSDStoreUploader) Upload(path string, filePath string) error {
+func (m *mockSDUploader) Upload(path string, filePath string) error {
 	if m.upload != nil {
 		return m.upload(path, filePath)
 	}
@@ -90,8 +90,8 @@ func newRealApp() App {
 
 func newAppFromEmitter(emitterPath string) App {
 	a := app{
-		storeUrl:         "http://localhost:80",
-		apiUrl:         "http://localhost:8080",
+		storeUrl:    "http://localhost:80",
+		apiUrl:      "http://localhost:8080",
 		emitterPath: emitterPath,
 		buildID:     "build123",
 		token:       "faketoken",
@@ -101,13 +101,13 @@ func newAppFromEmitter(emitterPath string) App {
 }
 
 type mockApp struct {
-	run         	func()
-	logReader   	func() io.Reader
-	uploader    	func() sdstoreuploader.SDStoreUploader
-	screwdriverAPI  func() screwdriver.API
-	archiveLogs 	func(uploader sdstoreuploader.SDStoreUploader, src io.Reader) error
-	stepSaver   	func(step string) StepSaver
-	buildID     	string
+	run            func()
+	logReader      func() io.Reader
+	uploader       func() sduploader.SDUploader
+	screwdriverAPI func() screwdriver.API
+	archiveLogs    func(uploader sduploader.SDUploader, src io.Reader) error
+	stepSaver      func(step string) StepSaver
+	buildID        string
 }
 
 func (a mockApp) Run() {
@@ -124,12 +124,12 @@ func (a mockApp) LogReader() io.Reader {
 	return mockEmitter()
 }
 
-func (a mockApp) Uploader() sdstoreuploader.SDStoreUploader {
+func (a mockApp) Uploader() sduploader.SDUploader {
 	if a.uploader != nil {
 		return a.uploader()
 	}
 
-	return &mockSDStoreUploader{}
+	return &mockSDUploader{}
 }
 
 func (a mockApp) ScrewdriverAPI() screwdriver.API {
