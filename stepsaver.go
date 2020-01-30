@@ -43,6 +43,7 @@ type stepSaver struct {
 	ticker         *time.Ticker
 	mutex          sync.Mutex
 	linesPerFile   int
+	logFolder      string
 }
 
 // Close cancels the save ticker, saves the logs for this step, and closes the logFiles.
@@ -95,8 +96,8 @@ func (s *stepSaver) WriteLog(l *logLine) error {
 }
 
 // newLogFile is a helper for adding a logFile to the internal collection of logFiles.
-func (s *stepSaver) newLogFile(storePath string) error {
-	lf, err := newLogFile(s.Uploader, storePath)
+func (s *stepSaver) newLogFile(fileName string) error {
+	lf, err := newLogFile(s.Uploader, s.logFolder, fileName)
 	if err != nil {
 		return err
 	}
@@ -170,8 +171,8 @@ func (s *stepSaver) Save() error {
 }
 
 // NewStepSaver creates a StepSaver out of a name and sduploader.SDUploader
-func NewStepSaver(name string, uploader sduploader.SDUploader, linesPerFile int, screwdriverAPI screwdriver.API) StepSaver {
-	s := &stepSaver{StepName: name, Uploader: uploader, ticker: time.NewTicker(uploadInterval), linesPerFile: linesPerFile, ScrewdriverAPI: screwdriverAPI}
+func NewStepSaver(name string, uploader sduploader.SDUploader, linesPerFile int, screwdriverAPI screwdriver.API, logFolder string) StepSaver {
+	s := &stepSaver{StepName: name, Uploader: uploader, ticker: time.NewTicker(uploadInterval), linesPerFile: linesPerFile, ScrewdriverAPI: screwdriverAPI, logFolder: logFolder}
 	e := json.NewEncoder(s)
 	s.encoder = e
 

@@ -1,18 +1,21 @@
 
 shared:
-    image: golang:1.10
+    image: golang:1.12
     environment:
         GOPATH: /sd/workspace
+        GO111MODULE: on
 
 jobs:
     main:
         requires: [~pr, ~commit]
         steps:
-            - get: go get -t ./...
+            - gover: go version
+            - install: go mod download
             - vet: go vet ./...
-            - gofmt: "find . -name '*.go' | xargs gofmt -s -w"
-            - test: go test -race ./...
+            - gofmt: (! gofmt -d . | grep '^')
+            - test: go test ./... -coverprofile=${SD_ARTIFACTS_DIR}/coverage.out -coverpkg=./...
             - build: go build -a -o $SD_ARTIFACTS_DIR/logservice
+            - test-release: "curl -sL https://git.io/goreleaser | bash -s -- --snapshot"
 
     publish:
         requires: [main]

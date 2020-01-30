@@ -42,7 +42,7 @@ func (m MockAPI) UpdateStepLines(stepName string, lineCount int) error {
 }
 
 func newTestStepSaver() *stepSaver {
-	s := &stepSaver{StepName: testStepName, Uploader: &mockSDUploader{}, ScrewdriverAPI: &MockAPI{}, linesPerFile: defaultLinesPerFile}
+	s := &stepSaver{StepName: testStepName, Uploader: &mockSDUploader{}, ScrewdriverAPI: &MockAPI{}, linesPerFile: defaultLinesPerFile, logFolder: "/tmp"}
 	e := json.NewEncoder(s)
 	s.encoder = e
 
@@ -162,7 +162,7 @@ func TestSaverUploadOnNewFile(t *testing.T) {
 	}
 	screwdriverAPI := mockAPI(t, testStepName)
 
-	s := NewStepSaver(testStepName, uploader, defaultLinesPerFile, screwdriverAPI)
+	s := NewStepSaver(testStepName, uploader, defaultLinesPerFile, screwdriverAPI, "/tmp")
 	for i := 0; i < defaultLinesPerFile; i++ {
 		l := &logLine{3456, fmt.Sprintf("LogMsg #%d", i), "step1"}
 		s.WriteLog(l)
@@ -206,7 +206,7 @@ func TestSaverUploadOnTimeElapsed(t *testing.T) {
 	screwdriverAPI := mockAPI(t, testStepName)
 
 	gotUploads := []upload{}
-	s := NewStepSaver(testStepName, uploader, defaultLinesPerFile, screwdriverAPI)
+	s := NewStepSaver(testStepName, uploader, defaultLinesPerFile, screwdriverAPI, "/tmp")
 	for i := 0; i < defaultLinesPerFile; i++ {
 		l := &logLine{3456, fmt.Sprintf("LogMsg #%d", i), "step1"}
 		s.WriteLog(l)
@@ -247,7 +247,7 @@ func TestSaverUploadOnClose(t *testing.T) {
 	}
 	screwdriverAPI := mockAPI(t, testStepName)
 
-	s := NewStepSaver(testStepName, uploader, defaultLinesPerFile, screwdriverAPI)
+	s := NewStepSaver(testStepName, uploader, defaultLinesPerFile, screwdriverAPI, "/tmp")
 	l := &logLine{4567, fmt.Sprintf("LogMsg #1"), "step1"}
 	s.WriteLog(l)
 

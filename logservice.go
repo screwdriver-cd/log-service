@@ -25,6 +25,7 @@ const (
 	startupTimeout      = 10 * time.Minute
 	logBufferSize       = 200
 	maxLineSize         = 5000
+	defaultLogFolder    = "/sd"
 )
 
 func main() {
@@ -44,6 +45,7 @@ func parseFlags() app {
 	flag.IntVar(&a.linesPerFile, "lines-per-file", defaultLinesPerFile, "Max number of lines per file when uploading ($SD_LINESPERFILE)")
 	flag.BoolVar(&a.isLocal, "local-mode", false, "Build run in local mode")
 	flag.StringVar(&a.buildLogFile, "build-log-file", "", "Path to the build log file in local mode")
+	flag.StringVar(&a.buildLogFolder, "build-log-folder", defaultLogFolder, "Directory where build log files are stored")
 	flag.Parse()
 
 	if len(os.Getenv("SD_LINESPERFILE")) != 0 {
@@ -123,8 +125,9 @@ type app struct {
 	apiUrl,
 	storeUrl,
 	buildLogFile string
-	linesPerFile int
-	isLocal      bool
+	linesPerFile   int
+	isLocal        bool
+	buildLogFolder string
 }
 
 // Uploader returns an Uploader object for the Screwdriver Store
@@ -178,7 +181,7 @@ func (a app) LogReader() io.Reader {
 
 // StepSaver returns a new StepSaver object based on the app config
 func (a app) StepSaver(step string) StepSaver {
-	return NewStepSaver(step, a.Uploader(), a.linesPerFile, a.ScrewdriverAPI())
+	return NewStepSaver(step, a.Uploader(), a.linesPerFile, a.ScrewdriverAPI(), a.buildLogFolder)
 }
 
 // BuildID returns the id of the build being processed.
