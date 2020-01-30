@@ -34,7 +34,6 @@ type StepSaver interface {
 
 type stepSaver struct {
 	StepName       string
-	logFolder      string
 	Uploader       sduploader.SDUploader
 	ScrewdriverAPI screwdriver.API
 	lineCount      int
@@ -44,6 +43,7 @@ type stepSaver struct {
 	ticker         *time.Ticker
 	mutex          sync.Mutex
 	linesPerFile   int
+	logFolder      string
 }
 
 // Close cancels the save ticker, saves the logs for this step, and closes the logFiles.
@@ -172,7 +172,7 @@ func (s *stepSaver) Save() error {
 
 // NewStepSaver creates a StepSaver out of a name and sduploader.SDUploader
 func NewStepSaver(name string, uploader sduploader.SDUploader, linesPerFile int, screwdriverAPI screwdriver.API, logFolder string) StepSaver {
-  s := &stepSaver{StepName: name, Uploader: uploader, ticker: time.NewTicker(uploadInterval), linesPerFile: linesPerFile, ScrewdriverAPI: screwdriverAPI, logFolder: logFolder}
+	s := &stepSaver{StepName: name, Uploader: uploader, ticker: time.NewTicker(uploadInterval), linesPerFile: linesPerFile, ScrewdriverAPI: screwdriverAPI, logFolder: logFolder}
 	e := json.NewEncoder(s)
 	s.encoder = e
 
