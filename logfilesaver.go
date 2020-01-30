@@ -29,8 +29,8 @@ type logFile struct {
 }
 
 // newLogFile returns a logFile object for saving a single file to the Store.
-func newLogFile(uploader sduploader.SDUploader, storePath string) (*logFile, error) {
-	file, err := ioutil.TempFile("/sd", filepath.Base(storePath))
+func newLogFile(uploader sduploader.SDUploader, logFolder string, storePath string) (*logFile, error) {
+	file, err := ioutil.TempFile(logFolder, filepath.Base(storePath))
 	if err != nil {
 		return &logFile{}, fmt.Errorf("creating temporary file for %s: %v", storePath, err)
 	}
