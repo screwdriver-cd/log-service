@@ -125,8 +125,8 @@ type app struct {
 	apiUrl,
 	storeUrl,
 	buildLogFile string
-	linesPerFile int
-	isLocal      bool
+	linesPerFile   int
+	isLocal        bool
 	buildLogFolder string
 }
 
