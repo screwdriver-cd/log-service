@@ -47,7 +47,7 @@ func New(buildID, url, token string) (API, error) {
 		buildID,
 		url,
 		token,
-		&http.Client{Timeout: 10 * time.Second},
+		&http.Client{Timeout: 20 * time.Second},
 	}
 	return API(newAPI), nil
 }
