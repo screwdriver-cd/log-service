@@ -10,3 +10,4 @@
 # goreleaser
 
 /dist/
+.idea/

@@ -2,6 +2,7 @@ package sduploader
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-retryablehttp"
 	"io"
 	"io/ioutil"
 	"log"
@@ -9,12 +10,17 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strconv"
+	"strings"
 	"time"
 )
 
-var retryScaler = 1.0
+// default configs
+var maxRetries = 5
+var httpTimeout = time.Duration(20) * time.Second
 
-const maxRetries = 6
+const retryWaitMax = 300
+const retryWaitMin = 100
 
 // SDUploader is able to upload the contents of a Reader to the SD Store
 type SDUploader interface {
@@ -25,16 +31,26 @@ type sdStoreUploader struct {
 	buildID string
 	url     string
 	token   string
-	client  *http.Client
+	client  *retryablehttp.Client
 }
 
 // NewStoreUploader returns an SDUploader for a given build.
 func NewStoreUploader(buildID, url, token string) SDUploader {
+	// read config from env variables
+	if strings.TrimSpace(os.Getenv("LOGSERVICE_STOREAPI_TIMEOUT_SECS")) != "" {
+		storeTimeout, _ := strconv.Atoi(os.Getenv("LOGSERVICE_STOREAPI_TIMEOUT_SECS"))
+		httpTimeout = time.Duration(storeTimeout) * time.Second
+	}
+
+	if strings.TrimSpace(os.Getenv("LOGSERVICE_STOREAPI_MAXRETRIES")) != "" {
+		maxRetries, _ = strconv.Atoi(os.Getenv("LOGSERVICE_STOREAPI_MAXRETRIES"))
+	}
+
 	return &sdStoreUploader{
 		buildID,
 		url,
 		token,
-		&http.Client{Timeout: 10 * time.Second},
+		retryablehttp.NewClient(),
 	}
 }
 
@@ -58,17 +74,12 @@ func (s *sdStoreUploader) Upload(storePath string, filePath string) error {
 		return fmt.Errorf("generating url for file %q to %s", filePath, storePath)
 	}
 
-	for i := 0; i < maxRetries; i++ {
-		time.Sleep(time.Duration(float64(i*i)*retryScaler) * time.Second)
-
-		err = s.putFile(u, "application/x-ndjson", filePath)
-		if err != nil {
-			log.Printf("(Try %d of %d) error received from file upload: %v", i+1, maxRetries, err)
-			continue
-		}
-		return nil
+	err = s.putFile(u, "application/x-ndjson", filePath)
+	if err != nil {
+		log.Printf("errored:[%v], posting file %q to %s", filePath, storePath, err)
+		return err
 	}
-	return fmt.Errorf("posting file %q to %s after %d retries: %v", filePath, storePath, maxRetries, err)
+	return nil
 }
 
 // makeURL creates the fully-qualified url for a given Store path
@@ -85,19 +96,6 @@ func (s *sdStoreUploader) makeURL(storePath string) (*url.URL, error) {
 
 func tokenHeader(token string) string {
 	return fmt.Sprintf("Bearer %s", token)
-}
-
-// handleResponse attempts to parse error objects from Screwdriver
-func handleResponse(res *http.Response) ([]byte, error) {
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response Body from Screwdriver: %v", err)
-	}
-
-	if res.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("HTTP %d returned: %s", res.StatusCode, body)
-	}
-	return body, nil
 }
 
 // putFile writes a file at filePath to a url with a PUT request. It streams the data
@@ -142,19 +140,34 @@ func (s *sdStoreUploader) put(url *url.URL, bodyType string, payload io.Reader, 
 		return nil, err
 	}
 
+	s.client.RetryMax = maxRetries
+	s.client.RetryWaitMin = time.Duration(retryWaitMin) * time.Millisecond
+	s.client.RetryWaitMax = time.Duration(retryWaitMax) * time.Millisecond
+	s.client.Backoff = retryablehttp.LinearJitterBackoff
+	s.client.HTTPClient.Timeout = httpTimeout
+	defer s.client.HTTPClient.CloseIdleConnections()
+
 	req.Header.Set("Authorization", tokenHeader(s.token))
 	req.Header.Set("Content-Type", bodyType)
 	req.ContentLength = size
 
-	res, err := s.client.Do(req)
+	res, err := s.client.StandardClient().Do(req)
+	if res != nil {
+		defer res.Body.Close()
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	if res.StatusCode/100 == 5 {
+	if res.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("response code %d", res.StatusCode)
 	}
 
-	defer res.Body.Close()
-	return handleResponse(res)
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response Body from Screwdriver: %v", err)
+	}
+
+	return body, nil
 }
