@@ -3,6 +3,8 @@ package sduploader
 import (
 	"bytes"
 	"fmt"
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -58,6 +60,8 @@ func testFile() *os.File {
 }
 
 func TestFileUpload(t *testing.T) {
+	var retryHttpClient *retryablehttp.Client
+	retryHttpClient = retryablehttp.NewClient()
 	testBuildID := "testbuild"
 	url := "http://fakeurl"
 	token := "faketoken"
@@ -66,7 +70,7 @@ func TestFileUpload(t *testing.T) {
 		testBuildID,
 		url,
 		token,
-		&http.Client{Timeout: 10 * time.Second},
+		retryHttpClient,
 	}
 	called := false
 
@@ -104,7 +108,7 @@ func TestFileUpload(t *testing.T) {
 			t.Errorf("Wrong Content-Length sent to uploader. Got %d, want %d", r.ContentLength, fsize)
 		}
 	})
-	uploader.client = http
+	uploader.client.HTTPClient = http
 	uploader.Upload(testPath, testFile().Name())
 
 	if !called {
@@ -113,7 +117,10 @@ func TestFileUpload(t *testing.T) {
 }
 
 func TestFileUploadRetry(t *testing.T) {
-	retryScaler = .01
+	var retryHttpClient *retryablehttp.Client
+	retryHttpClient = retryablehttp.NewClient()
+	retryHttpClient.RetryMax = 2
+	retryHttpClient.HTTPClient.Timeout = time.Duration(1) * time.Second
 	testBuildID := "testbuild"
 	url := "http://fakeurl"
 	token := "faketoken"
@@ -122,19 +129,36 @@ func TestFileUploadRetry(t *testing.T) {
 		testBuildID,
 		url,
 		token,
-		&http.Client{Timeout: 10 * time.Second},
+		retryHttpClient,
 	}
-
 	callCount := 0
 	http := makeFakeHTTPClient(t, 500, "ERROR", func(r *http.Request) {
 		callCount++
 	})
-	uploader.client = http
+	uploader.client.HTTPClient = http
 	err := uploader.Upload(testPath, testFile().Name())
 	if err == nil {
 		t.Error("Expected error from uploader.Upload(), got nil")
 	}
-	if callCount != 6 {
-		t.Errorf("Expected 6 retries, got %d", callCount)
+	if callCount != 3 {
+		t.Errorf("Expected 3 retries, got %d", callCount)
 	}
+}
+
+func TestNewStoreUploaderDefaults(t *testing.T) {
+	maxRetries = 5
+	httpTimeout = time.Duration(20) * time.Second
+	os.Setenv("LOGSERVICE_STOREAPI_TIMEOUT_SECS", "")
+	os.Setenv("LOGSERVICE_STOREAPI_MAXRETRIES", "")
+	_ = NewStoreUploader("1", "http://fakeurl", "fake")
+	assert.Equal(t, httpTimeout, time.Duration(20)*time.Second)
+	assert.Equal(t, maxRetries, 5)
+}
+
+func TestNewStoreUploader(t *testing.T) {
+	os.Setenv("LOGSERVICE_STOREAPI_TIMEOUT_SECS", "10")
+	os.Setenv("LOGSERVICE_STOREAPI_MAXRETRIES", "1")
+	_ = NewStoreUploader("1", "http://fakeurl", "fake")
+	assert.Equal(t, httpTimeout, time.Duration(10)*time.Second)
+	assert.Equal(t, maxRetries, 1)
 }
