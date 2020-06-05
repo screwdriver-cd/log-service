@@ -91,6 +91,8 @@ func TestUpdateStepLinesRetry(t *testing.T) {
 	client.HTTPClient = http
 	maxRetries = 2
 	httpTimeout = time.Duration(1) * time.Second
+	client.RetryMax = maxRetries
+	client.HTTPClient.Timeout = httpTimeout
 
 	testAPI := api{"123", "http://fakeurl", "faketoken", client}
 

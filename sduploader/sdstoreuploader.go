@@ -46,11 +46,18 @@ func NewStoreUploader(buildID, url, token string) SDUploader {
 		maxRetries, _ = strconv.Atoi(os.Getenv("LOGSERVICE_STOREAPI_MAXRETRIES"))
 	}
 
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = maxRetries
+	retryClient.RetryWaitMin = time.Duration(retryWaitMin) * time.Millisecond
+	retryClient.RetryWaitMax = time.Duration(retryWaitMax) * time.Millisecond
+	retryClient.Backoff = retryablehttp.LinearJitterBackoff
+	retryClient.HTTPClient.Timeout = httpTimeout
+
 	return &sdStoreUploader{
 		buildID,
 		url,
 		token,
-		retryablehttp.NewClient(),
+		retryClient,
 	}
 }
 
@@ -140,11 +147,6 @@ func (s *sdStoreUploader) put(url *url.URL, bodyType string, payload io.Reader, 
 		return nil, err
 	}
 
-	s.client.RetryMax = maxRetries
-	s.client.RetryWaitMin = time.Duration(retryWaitMin) * time.Millisecond
-	s.client.RetryWaitMax = time.Duration(retryWaitMax) * time.Millisecond
-	s.client.Backoff = retryablehttp.LinearJitterBackoff
-	s.client.HTTPClient.Timeout = httpTimeout
 	defer s.client.HTTPClient.CloseIdleConnections()
 
 	req.Header.Set("Authorization", tokenHeader(s.token))

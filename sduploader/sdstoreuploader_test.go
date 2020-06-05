@@ -119,6 +119,8 @@ func TestFileUpload(t *testing.T) {
 func TestFileUploadRetry(t *testing.T) {
 	var retryHttpClient *retryablehttp.Client
 	retryHttpClient = retryablehttp.NewClient()
+	retryHttpClient.RetryMax = 2
+	retryHttpClient.HTTPClient.Timeout = time.Duration(1) * time.Second
 	testBuildID := "testbuild"
 	url := "http://fakeurl"
 	token := "faketoken"
@@ -129,8 +131,6 @@ func TestFileUploadRetry(t *testing.T) {
 		token,
 		retryHttpClient,
 	}
-
-	maxRetries = 2
 	callCount := 0
 	http := makeFakeHTTPClient(t, 500, "ERROR", func(r *http.Request) {
 		callCount++
@@ -141,7 +141,7 @@ func TestFileUploadRetry(t *testing.T) {
 		t.Error("Expected error from uploader.Upload(), got nil")
 	}
 	if callCount != 3 {
-		t.Errorf("Expected 6 retries, got %d", callCount)
+		t.Errorf("Expected 3 retries, got %d", callCount)
 	}
 }
 

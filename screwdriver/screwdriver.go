@@ -48,12 +48,6 @@ type api struct {
 
 // New returns a new API object
 func New(buildID, url, token string) (API, error) {
-	newAPI := api{
-		buildID,
-		url,
-		token,
-		retryablehttp.NewClient(),
-	}
 	// read config from env variables
 	if strings.TrimSpace(os.Getenv("LOGSERVICE_SDAPI_TIMEOUT_SECS")) != "" {
 		apiTimeout, _ := strconv.Atoi(os.Getenv("LOGSERVICE_SDAPI_TIMEOUT_SECS"))
@@ -64,6 +58,19 @@ func New(buildID, url, token string) (API, error) {
 		maxRetries, _ = strconv.Atoi(os.Getenv("LOGSERVICE_SDAPI_MAXRETRIES"))
 	}
 
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = maxRetries
+	retryClient.RetryWaitMin = time.Duration(retryWaitMin) * time.Millisecond
+	retryClient.RetryWaitMax = time.Duration(retryWaitMax) * time.Millisecond
+	retryClient.Backoff = retryablehttp.LinearJitterBackoff
+	retryClient.HTTPClient.Timeout = httpTimeout
+
+	newAPI := api{
+		buildID,
+		url,
+		token,
+		retryClient,
+	}
 	return API(newAPI), nil
 }
 
@@ -101,11 +108,6 @@ func (a api) write(url *url.URL, requestType string, bodyType string, payload io
 		return nil, fmt.Errorf("WARNING: received error generating new request for %s(%s): %v ", requestType, url.String(), err)
 	}
 
-	a.client.RetryMax = maxRetries
-	a.client.RetryWaitMin = time.Duration(retryWaitMin) * time.Millisecond
-	a.client.RetryWaitMax = time.Duration(retryWaitMax) * time.Millisecond
-	a.client.Backoff = retryablehttp.LinearJitterBackoff
-	a.client.HTTPClient.Timeout = httpTimeout
 	defer a.client.HTTPClient.CloseIdleConnections()
 
 	req.Header.Set("Authorization", tokenHeader(a.token))
