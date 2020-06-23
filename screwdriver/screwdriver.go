@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/go-retryablehttp"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 // default configs
@@ -90,8 +91,6 @@ func tokenHeader(token string) string {
 }
 
 func (a api) write(url *url.URL, requestType string, bodyType string, payload io.Reader) ([]byte, error) {
-	var errParse SDError
-
 	req := &http.Request{}
 	buf := new(bytes.Buffer)
 
@@ -124,21 +123,22 @@ func (a api) write(url *url.URL, requestType string, bodyType string, payload io
 		return nil, fmt.Errorf("WARNING: received error from %s(%s): %v ", requestType, url.String(), err)
 	}
 
-	if res.StatusCode/100 != 2 {
-		log.Printf("WARNING: received response %d from %s ", res.StatusCode, url.String())
-		return nil, fmt.Errorf("WARNING: received response %d from %s ", res.StatusCode, url.String())
-	}
-
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		log.Printf("reading response Body from Screwdriver: %v", err)
 		return nil, fmt.Errorf("reading response Body from Screwdriver: %v", err)
 	}
 
-	parseError := json.Unmarshal(body, &errParse)
-	if parseError != nil {
-		log.Printf("unparseable error response from Screwdriver: %v", parseError)
-		return nil, fmt.Errorf("unparseable error response from Screwdriver: %v", parseError)
+	if res.StatusCode/100 != 2 {
+		var errParse SDError
+		parseError := json.Unmarshal(body, &errParse)
+		if parseError != nil {
+			log.Printf("unparseable error response from Screwdriver: %v", parseError)
+			return nil, fmt.Errorf("unparseable error response from Screwdriver: %v", parseError)
+		}
+
+		log.Printf("WARNING: received response %d from %s ", res.StatusCode, url.String())
+		return nil, fmt.Errorf("WARNING: received response %d from %s ", res.StatusCode, url.String())
 	}
 
 	return body, nil
