@@ -2,7 +2,6 @@ package sduploader
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-retryablehttp"
 	"io"
 	"io/ioutil"
 	"log"
@@ -13,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 // default configs
@@ -37,13 +38,13 @@ type sdStoreUploader struct {
 // NewStoreUploader returns an SDUploader for a given build.
 func NewStoreUploader(buildID, url, token string) SDUploader {
 	// read config from env variables
-	if strings.TrimSpace(os.Getenv("LOGSERVICE_STOREAPI_TIMEOUT_SECS")) != "" {
-		storeTimeout, _ := strconv.Atoi(os.Getenv("LOGSERVICE_STOREAPI_TIMEOUT_SECS"))
+	if strings.TrimSpace(os.Getenv("STOREAPI_TIMEOUT_SECS")) != "" {
+		storeTimeout, _ := strconv.Atoi(os.Getenv("STOREAPI_TIMEOUT_SECS"))
 		httpTimeout = time.Duration(storeTimeout) * time.Second
 	}
 
-	if strings.TrimSpace(os.Getenv("LOGSERVICE_STOREAPI_MAXRETRIES")) != "" {
-		maxRetries, _ = strconv.Atoi(os.Getenv("LOGSERVICE_STOREAPI_MAXRETRIES"))
+	if strings.TrimSpace(os.Getenv("STOREAPI_MAXRETRIES")) != "" {
+		maxRetries, _ = strconv.Atoi(os.Getenv("STOREAPI_MAXRETRIES"))
 	}
 
 	retryClient := retryablehttp.NewClient()

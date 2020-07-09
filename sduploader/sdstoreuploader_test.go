@@ -3,8 +3,6 @@ package sduploader
 import (
 	"bytes"
 	"fmt"
-	"github.com/hashicorp/go-retryablehttp"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +10,9 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/stretchr/testify/assert"
 )
 
 func validateHeader(t *testing.T, key, value string) func(r *http.Request) {
@@ -148,16 +149,16 @@ func TestFileUploadRetry(t *testing.T) {
 func TestNewStoreUploaderDefaults(t *testing.T) {
 	maxRetries = 5
 	httpTimeout = time.Duration(20) * time.Second
-	os.Setenv("LOGSERVICE_STOREAPI_TIMEOUT_SECS", "")
-	os.Setenv("LOGSERVICE_STOREAPI_MAXRETRIES", "")
+	os.Setenv("STOREAPI_TIMEOUT_SECS", "")
+	os.Setenv("STOREAPI_MAXRETRIES", "")
 	_ = NewStoreUploader("1", "http://fakeurl", "fake")
 	assert.Equal(t, httpTimeout, time.Duration(20)*time.Second)
 	assert.Equal(t, maxRetries, 5)
 }
 
 func TestNewStoreUploader(t *testing.T) {
-	os.Setenv("LOGSERVICE_STOREAPI_TIMEOUT_SECS", "10")
-	os.Setenv("LOGSERVICE_STOREAPI_MAXRETRIES", "1")
+	os.Setenv("STOREAPI_TIMEOUT_SECS", "10")
+	os.Setenv("STOREAPI_MAXRETRIES", "1")
 	_ = NewStoreUploader("1", "http://fakeurl", "fake")
 	assert.Equal(t, httpTimeout, time.Duration(10)*time.Second)
 	assert.Equal(t, maxRetries, 1)
