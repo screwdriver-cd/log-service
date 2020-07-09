@@ -3,8 +3,6 @@ package screwdriver
 import (
 	"bytes"
 	"fmt"
-	"github.com/hashicorp/go-retryablehttp"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,6 +10,9 @@ import (
 	"regexp"
 	"testing"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/stretchr/testify/assert"
 )
 
 func makeValidatedFakeHTTPClient(t *testing.T, code int, body string, v func(r *http.Request)) *http.Client {
@@ -104,16 +105,16 @@ func TestNewDefaults(t *testing.T) {
 	maxRetries = 5
 	httpTimeout = time.Duration(20) * time.Second
 
-	os.Setenv("LOGSERVICE_SDAPI_TIMEOUT_SECS", "")
-	os.Setenv("LOGSERVICE_SDAPI_MAXRETRIES", "")
+	os.Setenv("SDAPI_TIMEOUT_SECS", "")
+	os.Setenv("SDAPI_MAXRETRIES", "")
 	_, _ = New("1", "http://fakeurl", "fake")
 	assert.Equal(t, httpTimeout, time.Duration(20)*time.Second)
 	assert.Equal(t, maxRetries, 5)
 }
 
 func TestNew(t *testing.T) {
-	os.Setenv("LOGSERVICE_SDAPI_TIMEOUT_SECS", "10")
-	os.Setenv("LOGSERVICE_SDAPI_MAXRETRIES", "1")
+	os.Setenv("SDAPI_TIMEOUT_SECS", "10")
+	os.Setenv("SDAPI_MAXRETRIES", "1")
 	_, _ = New("1", "http://fakeurl", "fake")
 	assert.Equal(t, httpTimeout, time.Duration(10)*time.Second)
 	assert.Equal(t, maxRetries, 1)

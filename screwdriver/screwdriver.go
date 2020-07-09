@@ -50,13 +50,13 @@ type api struct {
 // New returns a new API object
 func New(buildID, url, token string) (API, error) {
 	// read config from env variables
-	if strings.TrimSpace(os.Getenv("LOGSERVICE_SDAPI_TIMEOUT_SECS")) != "" {
-		apiTimeout, _ := strconv.Atoi(os.Getenv("LOGSERVICE_SDAPI_TIMEOUT_SECS"))
+	if strings.TrimSpace(os.Getenv("SDAPI_TIMEOUT_SECS")) != "" {
+		apiTimeout, _ := strconv.Atoi(os.Getenv("SDAPI_TIMEOUT_SECS"))
 		httpTimeout = time.Duration(apiTimeout) * time.Second
 	}
 
-	if strings.TrimSpace(os.Getenv("LOGSERVICE_SDAPI_MAXRETRIES")) != "" {
-		maxRetries, _ = strconv.Atoi(os.Getenv("LOGSERVICE_SDAPI_MAXRETRIES"))
+	if strings.TrimSpace(os.Getenv("SDAPI_MAXRETRIES")) != "" {
+		maxRetries, _ = strconv.Atoi(os.Getenv("SDAPI_MAXRETRIES"))
 	}
 
 	retryClient := retryablehttp.NewClient()
