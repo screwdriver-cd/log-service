@@ -8,8 +8,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/screwdriver-cd/log-service/screwdriver"
@@ -193,6 +195,14 @@ func (a app) BuildID() string {
 func run(a App) {
 	log.Println("Processing logs for build", a.BuildID())
 	defer log.Println("Processing complete for build", a.BuildID())
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigs
+		log.Printf("Received %v signal in log service", sig)
+	}()
 
 	if err := ArchiveLogs(a); err != nil {
 		log.Printf("Error archiving logs: %v", err)
