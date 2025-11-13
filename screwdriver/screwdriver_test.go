@@ -98,7 +98,7 @@ func TestUpdateStepLinesRetry(t *testing.T) {
 	testAPI := api{"123", "http://fakeurl", "faketoken", client}
 
 	err := testAPI.UpdateStepLines("step1", 2000)
-	assert.Contains(t, err.Error(), "giving up after 3 attempts")
+	assert.Contains(t, err.Error(), "giving up after 3 attempt(s)")
 }
 
 func TestNewDefaults(t *testing.T) {
